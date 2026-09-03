@@ -23,7 +23,7 @@ export const records = rawRecords as Record[];
 export const PERIODO = { inicio: "17/08/2026", fim: "01/09/2026", gerado: "03/09/2026 às 10:21" };
 
 export const parseDate = (str: string) => {
-  const [d, m, y] = str.split("/").map(Number);
+  const [d, m, y] = str.split("/").map(Number) as [number, number, number];
   return new Date(y, m - 1, d);
 };
 
@@ -71,7 +71,7 @@ function groupBy(recs: Record[], key: (r: Record) => string) {
 
 export type Row = {
   nome: string;
-  grupo?: string;
+  grupo?: string | undefined;
   receita: number;
   volume: number;
   pedidos: number;
