@@ -1,0 +1,2275 @@
+# -*- coding: utf-8 -*-
+"""
+Gerador Oficial do Dashboard — Mix de Produtos
+Identidade Visual Oficial: Lovable Design System (Agronegócio Dark) com Glassmorphism Premium
+
+Atualizações v7:
+- Ícones da seção "Inteligência para Montagem de Kits" integrados no padrão vetorial Flaticon
+- Frase do subtítulo da seção reescrita conforme solicitação exata do usuário
+- Emojis substituídos por ícones SVG oficiais Flaticon (Âncora, Raio/Agregador e Pacote/Giro)
+- Preservação total de centavos exatos e ausência de cortes de texto
+"""
+
+
+import os
+import sys
+from datetime import datetime
+
+import pandas as pd
+
+
+def find_file(filename, search_dirs):
+    for d in search_dirs:
+        candidate = os.path.join(d, filename)
+        if os.path.exists(candidate):
+            return candidate
+    return None
+
+
+def main():
+    root_dir = os.path.dirname(os.path.abspath(__file__))
+    search_dirs = [root_dir, os.path.dirname(root_dir)]
+
+    print("=========================================================")
+    print("  GERADOR DO DASHBOARD — MIX DE PRODUTOS")
+    print("  Identidade Visual: Lovable Glassmorphism Premium (v7)")
+    print("  Ícones Oficiais Flaticon e Texto Atualizado")
+    print("=========================================================")
+
+    # 1. Localizar arquivos Excel
+    vendas_path = find_file("Modalidade de Venda.xlsx", search_dirs)
+    if not vendas_path:
+        vendas_path = find_file("Modalidade de Vendas.xlsx", search_dirs)
+    produtos_path = find_file("Produtos e Grupo de Produtos.xlsx", search_dirs)
+
+    if not vendas_path:
+        print("❌ ERRO: Arquivo 'Modalidade de Venda.xlsx' não encontrado!")
+        sys.exit(1)
+    if not produtos_path:
+        print("❌ ERRO: Arquivo 'Produtos e Grupo de Produtos.xlsx' não encontrado!")
+        sys.exit(1)
+
+    print(f"📂 Arquivo de Vendas:   {vendas_path}")
+    print(f"📂 Arquivo de Produtos: {produtos_path}")
+
+    # 2. Carregar dados
+    print("\n⏳ Lendo planilhas Excel...")
+    df_vendas = pd.read_excel(vendas_path)
+    df_produtos = pd.read_excel(produtos_path)
+
+    print(f"✓ Linhas de vendas: {len(df_vendas):,}")
+    print(f"✓ Cadastro de produtos: {len(df_produtos):,}")
+
+    # 3. Mapear Grupos
+    col_grupo_cod = None
+    col_grupo_desc = None
+    for c in df_produtos.columns:
+        c_str = str(c).lower()
+        if "grupo" in c_str and ("código" in c_str or "codigo" in c_str):
+            col_grupo_cod = c
+        elif "grupo" in c_str and ("descri" in c_str or "nome" in c_str):
+            col_grupo_desc = c
+
+    if col_grupo_cod is None or col_grupo_desc is None:
+        col_grupo_cod = df_produtos.columns[3]
+        col_grupo_desc = df_produtos.columns[4]
+
+    grupo_map = (
+        df_produtos[[col_grupo_cod, col_grupo_desc]]
+        .dropna()
+        .drop_duplicates()
+        .set_index(col_grupo_cod)[col_grupo_desc]
+        .to_dict()
+    )
+
+    # 4. Filtrar Mix de Produtos
+    col_mod = None
+    for c in df_vendas.columns:
+        if "modalidade" in str(c).lower():
+            col_mod = c
+            break
+    if col_mod is None:
+        col_mod = df_vendas.columns[7]
+
+    mix_df = df_vendas[df_vendas[col_mod].astype(str).str.strip() == "Mix de Produtos"].copy()
+    print(f"✓ Registros da modalidade 'Mix de Produtos': {len(mix_df)}")
+
+    if len(mix_df) == 0:
+        print("⚠️ AVISO: Nenhum registro de 'Mix de Produtos' encontrado.")
+        sys.exit(0)
+
+    # Mapear colunas de vendas
+    col_map = {}
+    for c in df_vendas.columns:
+        c_lower = str(c).lower()
+        if "data" in c_lower and ("início" in c_lower or "inicio" in c_lower):
+            col_map["data"] = c
+        elif "número do pedido" in c_lower or "numero do pedido" in c_lower:
+            if "erp" not in c_lower and "pedido" not in col_map:
+                col_map["pedido"] = c
+        elif "matricula" in c_lower or "matrícula" in c_lower:
+            col_map["matricula"] = c
+        elif "nome da conta" in c_lower or "cooperado" in c_lower:
+            col_map["cooperado"] = c
+        elif "filial" in c_lower:
+            col_map["filial"] = c
+        elif "campanha" in c_lower:
+            col_map["campanha"] = c
+        elif "vendedor" in c_lower:
+            col_map["vendedor"] = c
+        elif "código do produto" in c_lower or "codigo do produto" in c_lower:
+            col_map["cod_produto"] = c
+        elif "nome do produto" in c_lower or ("produto" in c_lower and "grupo" not in c_lower and "cod" not in c_lower):
+            if "produto" not in col_map:
+                col_map["produto"] = c
+        elif "grupo de produto" in c_lower:
+            col_map["grupo"] = c
+        elif "quantidade" in c_lower:
+            col_map["quantidade"] = c
+        elif "preço total" in c_lower or "preco total" in c_lower:
+            col_map["preco_total"] = c
+        elif "status" in c_lower:
+            col_map["status"] = c
+        elif "valor do pedido" in c_lower:
+            col_map["valor_pedido"] = c
+
+    def get_val(row, key, default=None, conv=None):
+        col_name = col_map.get(key)
+        val = row[col_name] if col_name and col_name in row else default
+        if pd.isna(val):
+            val = default
+        if conv and val is not None:
+            try:
+                return conv(val)
+            except Exception:
+                return default
+        return val
+
+    records = []
+    datas_list = []
+
+    for _, row in mix_df.iterrows():
+        data_raw = get_val(row, "data")
+        if isinstance(data_raw, datetime) or hasattr(data_raw, "strftime"):
+            data_str = data_raw.strftime("%d/%m/%Y")
+            data_dt = pd.to_datetime(data_raw)
+        else:
+            data_dt = pd.to_datetime(str(data_raw), format="%d/%m/%Y", errors="coerce")
+            data_str = data_dt.strftime("%d/%m/%Y") if pd.notna(data_dt) else str(data_raw)
+
+        if pd.notna(data_dt):
+            datas_list.append(data_dt)
+
+        grp_cod = get_val(row, "grupo")
+        grp_nome = grupo_map.get(grp_cod, "Outros")
+        if pd.isna(grp_nome) or not grp_nome:
+            grp_nome = "Outros"
+
+        rec = {
+            "data": data_str,
+            "pedido": int(get_val(row, "pedido", 0, int)),
+            "matricula": int(get_val(row, "matricula", 0, int)),
+            "cooperado": str(get_val(row, "cooperado", "")).strip(),
+            "filial": str(get_val(row, "filial", "")).strip(),
+            "campanha": str(get_val(row, "campanha", "")).strip() if pd.notna(get_val(row, "campanha")) else "Sem Campanha",
+            "vendedor": str(get_val(row, "vendedor", "")).strip(),
+            "produto": str(get_val(row, "produto", "")).strip(),
+            "grupo": str(grp_nome).strip(),
+            "quantidade": float(get_val(row, "quantidade", 0.0, float)),
+            "preco_total": float(get_val(row, "preco_total", 0.0, float)),
+            "status": str(get_val(row, "status", "")).strip(),
+            "valor_pedido": float(get_val(row, "valor_pedido", 0.0, float)),
+        }
+        records.append(rec)
+
+    if datas_list:
+        datas_list.sort()
+        dt_ini = datas_list[0].strftime("%d/%m/%Y")
+        dt_fim = datas_list[-1].strftime("%d/%m/%Y")
+    else:
+        dt_ini = "17/08/2026"
+        dt_fim = "01/09/2026"
+
+    agora = datetime.now().strftime("%d/%m/%Y às %H:%M")
+
+    # 5. Gerar HTML estático oficial v7
+    print("\n🎨 Gerando index.html atualizado com ícones Flaticon e novo texto...")
+    output_html_path = os.path.join(root_dir, "index.html")
+
+    html_content = f"""<!DOCTYPE html>
+<html lang="pt-BR" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mix de Produtos | Análise Executiva e Inteligência para Montagem de Kits</title>
+  <meta name="description" content="Painel executivo da modalidade Mix de Produtos: receita (valor total de vendas com centavos), quantidade, inteligência para montagem de kits por ticket médio, curva ABC, filiais e vendedores.">
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Manrope:wght@600;700;800&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <style>
+    /* Lovable Glassmorphism Design Tokens */
+    :root {{
+      --background: #0f1912;
+      --foreground: #f1f7f2;
+      --surface: rgba(24, 38, 29, 0.72);
+      --surface-2: rgba(33, 51, 39, 0.65);
+      --surface-hover: rgba(30, 48, 36, 0.88);
+      --card: rgba(24, 38, 29, 0.72);
+      --card-foreground: #f1f7f2;
+      --primary: #4ade80;
+      --primary-foreground: #0f1912;
+      --secondary: rgba(35, 55, 43, 0.7);
+      --secondary-foreground: #f1f7f2;
+      --muted: rgba(35, 55, 43, 0.6);
+      --muted-foreground: #9dbca4;
+      --border: rgba(74, 222, 128, 0.16);
+      --border-highlight: rgba(74, 222, 128, 0.45);
+      --gold: #f5c842;
+      --gold-glow: rgba(245, 200, 66, 0.25);
+      --cyan: #38bdf8;
+      --destructive: #ef4444;
+      --chart-1: #4ade80;
+      --chart-2: #f5c842;
+      --chart-3: #38bdf8;
+      --chart-4: #a3e635;
+      --chart-5: #fb923c;
+      --chart-6: #34d399;
+      --chart-7: #818cf8;
+      --radius: 0.625rem;
+    }}
+
+    *, *::before, *::after {{
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }}
+
+    html {{
+      scroll-behavior: smooth;
+      background-color: var(--background);
+      color: var(--foreground);
+      font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    }}
+
+    body {{
+      min-height: 100vh;
+      line-height: 1.5;
+      background-color: var(--background);
+      background-image: 
+        radial-gradient(circle at 15% 15%, rgba(74, 222, 128, 0.08) 0%, transparent 45%),
+        radial-gradient(circle at 85% 25%, rgba(245, 200, 66, 0.05) 0%, transparent 40%),
+        radial-gradient(circle at 50% 70%, rgba(52, 211, 153, 0.06) 0%, transparent 50%);
+      background-attachment: fixed;
+    }}
+
+    .num {{
+      font-variant-numeric: tabular-nums;
+    }}
+
+    /* Efeito Glassmorphism Premium nos Painéis */
+    .panel {{
+      background: var(--surface);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.35);
+      transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    }}
+
+    .panel:hover {{
+      border-color: var(--border-highlight);
+      box-shadow: 0 12px 36px 0 rgba(0, 0, 0, 0.45), 0 0 20px rgba(74, 222, 128, 0.08);
+      transform: translateY(-2px);
+    }}
+
+    .header-nav {{
+      position: sticky;
+      top: 0;
+      z-index: 30;
+      border-bottom: 1px solid var(--border);
+      background: rgba(15, 25, 18, 0.78);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25);
+    }}
+
+    select, input[type="date"] {{
+      height: 2.25rem;
+      border-radius: calc(var(--radius) - 2px);
+      border: 1px solid var(--border);
+      background-color: var(--surface-2);
+      padding: 0 0.75rem;
+      font-size: 0.875rem;
+      color: var(--foreground);
+      outline: none;
+      transition: all 0.2s ease;
+      font-family: inherit;
+    }}
+    select:focus, input[type="date"]:focus {{
+      border-color: var(--primary);
+      box-shadow: 0 0 12px rgba(74, 222, 128, 0.25);
+    }}
+
+    .btn {{
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      height: 2.25rem;
+      padding: 0 0.875rem;
+      border-radius: calc(var(--radius) - 2px);
+      border: 1px solid var(--border);
+      background: var(--surface-2);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      color: var(--foreground);
+      font-size: 0.875rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+      font-family: inherit;
+    }}
+    .btn:hover {{
+      background-color: var(--secondary);
+      border-color: var(--primary);
+      box-shadow: 0 0 14px rgba(74, 222, 128, 0.2);
+      transform: translateY(-1px);
+    }}
+
+    .btn-export {{
+      background: rgba(74, 222, 128, 0.12);
+      border-color: rgba(74, 222, 128, 0.35);
+      color: var(--primary);
+      font-weight: 600;
+      font-size: 0.8rem;
+    }}
+    .btn-export:hover {{
+      background: rgba(74, 222, 128, 0.22);
+      border-color: var(--primary);
+      box-shadow: 0 0 16px rgba(74, 222, 128, 0.3);
+    }}
+
+    /* Badges */
+    .badge {{
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      justify-content: center;
+      height: 1.45rem;
+      min-width: 1.45rem;
+      padding: 0 0.5rem;
+      border-radius: 4px;
+      font-size: 10.5px;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+    }}
+    .badge-a {{
+      background-color: rgba(74, 222, 128, 0.2);
+      color: var(--primary);
+      border: 1px solid rgba(74, 222, 128, 0.4);
+    }}
+    .badge-b {{
+      background-color: rgba(245, 200, 66, 0.2);
+      color: var(--gold);
+      border: 1px solid rgba(245, 200, 66, 0.4);
+    }}
+    .badge-c {{
+      background-color: var(--secondary);
+      color: var(--muted-foreground);
+      border: 1px solid var(--border);
+    }}
+    .badge-kit-ancora {{
+      background-color: rgba(74, 222, 128, 0.18);
+      color: var(--primary);
+      border: 1px solid rgba(74, 222, 128, 0.45);
+    }}
+    .badge-kit-agregador {{
+      background-color: rgba(245, 200, 66, 0.18);
+      color: var(--gold);
+      border: 1px solid rgba(245, 200, 66, 0.45);
+    }}
+    .badge-kit-giro {{
+      background-color: rgba(56, 189, 248, 0.18);
+      color: var(--cyan);
+      border: 1px solid rgba(56, 189, 248, 0.45);
+    }}
+
+    .rank-circle {{
+      display: inline-flex;
+      width: 1.5rem;
+      height: 1.5rem;
+      align-items: center;
+      justify-content: center;
+      border-radius: 9999px;
+      border: 1px solid var(--border);
+      background-color: var(--secondary);
+      color: var(--muted-foreground);
+      font-size: 11px;
+      font-weight: 600;
+      transition: all 0.2s ease;
+    }}
+    .rank-circle.top1 {{
+      border-color: rgba(245, 200, 66, 0.5);
+      background-color: rgba(245, 200, 66, 0.2);
+      color: var(--gold);
+    }}
+    .rank-circle.top2, .rank-circle.top3 {{
+      border-color: rgba(74, 222, 128, 0.5);
+      background-color: rgba(74, 222, 128, 0.15);
+      color: var(--primary);
+    }}
+
+    /* Data Tables SEM barra horizontal */
+    .data-table-container {{
+      width: 100%;
+      overflow-x: hidden;
+    }}
+    table.data-table {{
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.85rem;
+      text-align: left;
+      table-layout: auto;
+    }}
+    table.data-table th {{
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      background-color: rgba(28, 44, 34, 0.95);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border);
+      padding: 0.65rem 0.75rem;
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--muted-foreground);
+      white-space: nowrap;
+    }}
+    table.data-table th.text-right, table.data-table td.text-right {{
+      text-align: right;
+    }}
+    table.data-table td {{
+      padding: 0.65rem 0.75rem;
+      border-bottom: 1px solid rgba(74, 222, 128, 0.08);
+      vertical-align: middle;
+      transition: background-color 0.15s ease;
+    }}
+    table.data-table td.cell-nowrap {{
+      white-space: nowrap;
+    }}
+    table.data-table td.cell-wrap {{
+      white-space: normal;
+      word-break: break-word;
+      line-height: 1.35;
+    }}
+    table.data-table tbody tr:hover td {{
+      background-color: rgba(74, 222, 128, 0.08);
+    }}
+
+    /* Box Didático de Explicação Glassmorphism */
+    .info-box {{
+      background: rgba(20, 35, 25, 0.65);
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      border-left: 4px solid var(--primary);
+      border-top: 1px solid var(--border);
+      border-right: 1px solid var(--border);
+      border-bottom: 1px solid var(--border);
+      border-radius: 0 var(--radius) var(--radius) 0;
+      padding: 0.875rem 1.125rem;
+      font-size: 0.8rem;
+      line-height: 1.5;
+      color: var(--muted-foreground);
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+    }}
+
+    .kit-guide-box {{
+      background: rgba(26, 43, 33, 0.75);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1.125rem 1.25rem;
+      box-shadow: 0 8px 30px rgba(0, 0, 0, 0.25);
+      transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    }}
+    .kit-guide-box:hover {{
+      border-color: var(--border-highlight);
+      transform: translateY(-2px);
+      box-shadow: 0 12px 34px rgba(0, 0, 0, 0.4);
+    }}
+
+    /* Share bar */
+    .share-bar-wrapper {{
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 0.375rem;
+    }}
+    .share-bar-track {{
+      display: inline-block;
+      height: 0.25rem;
+      width: 3rem;
+      border-radius: 9999px;
+      background-color: var(--secondary);
+      overflow: hidden;
+    }}
+    .share-bar-fill {{
+      height: 100%;
+      border-radius: 9999px;
+      background-color: var(--primary);
+    }}
+
+    /* Layout */
+    .max-container {{
+      max-width: 1400px;
+      margin-left: auto;
+      margin-right: auto;
+      padding-left: 1.5rem;
+      padding-right: 1.5rem;
+    }}
+    .grid-kpis {{
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 0.75rem;
+    }}
+    @media (min-width: 1024px) {{
+      .grid-kpis {{
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+      }}
+    }}
+    .grid-2cols {{
+      display: grid;
+      gap: 1rem;
+      grid-template-columns: 1fr;
+    }}
+    @media (min-width: 1024px) {{
+      .grid-2cols {{
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }}
+    }}
+    .grid-3cols {{
+      display: grid;
+      gap: 0.75rem;
+      grid-template-columns: 1fr;
+    }}
+    @media (min-width: 640px) {{
+      .grid-3cols {{
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+      }}
+    }}
+    .grid-campanhas {{
+      display: grid;
+      gap: 1rem;
+      grid-template-columns: 1fr;
+    }}
+    @media (min-width: 1024px) {{
+      .grid-campanhas {{
+        grid-template-columns: 1fr 1.2fr;
+      }}
+    }}
+
+    .section-spacing {{
+      margin-bottom: 3.5rem;
+      scroll-margin-top: 5.5rem;
+    }}
+
+    /* Container de gráfico com padding seguro para não cortar início de palavras */
+    .chart-container-padded {{
+      padding: 1rem 1.25rem 1rem 1.75rem;
+      position: relative;
+    }}
+
+    /* Tabs ABC */
+    .tab-btn {{
+      padding: 0.5rem 1rem;
+      border-radius: 6px;
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: var(--muted-foreground);
+      background: transparent;
+      border: 1px solid transparent;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      transition: all 0.2s ease;
+      font-family: inherit;
+    }}
+    .tab-btn:hover {{
+      color: var(--foreground);
+      background: var(--surface-2);
+      border-color: var(--border);
+    }}
+    .tab-btn.active {{
+      color: var(--foreground);
+      background: var(--surface-2);
+      border-color: var(--border-highlight);
+      box-shadow: 0 0 12px rgba(74, 222, 128, 0.15);
+    }}
+
+    /* SVGs Estilo Flaticon */
+    .icon {{
+      width: 1.05rem;
+      height: 1.05rem;
+      stroke-width: 1.75;
+      stroke: currentColor;
+      fill: none;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      flex-shrink: 0;
+    }}
+    .icon-flaticon-box {{
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 1.85rem;
+      height: 1.85rem;
+      border-radius: 0.375rem;
+    }}
+    .icon-primary {{ color: var(--primary); }}
+    .icon-gold {{ color: var(--gold); }}
+    .icon-cyan {{ color: var(--cyan); }}
+
+    ::-webkit-scrollbar {{
+      width: 6px;
+      height: 6px;
+    }}
+    ::-webkit-scrollbar-track {{
+      background: var(--surface);
+    }}
+    ::-webkit-scrollbar-thumb {{
+      background: var(--border);
+      border-radius: 3px;
+    }}
+    ::-webkit-scrollbar-thumb:hover {{
+      background: var(--muted-foreground);
+    }}
+  </style>
+</head>
+<body>
+
+  <!-- Overlay de carregamento (removido automaticamente após carregar dados) -->
+  <div id="loading-overlay" style="position: fixed; inset: 0; z-index: 9999; display: flex; align-items: center; justify-content: center; background: var(--background);">
+    <div style="text-align: center;">
+      <div style="width: 48px; height: 48px; border: 4px solid var(--border); border-top-color: var(--primary); border-radius: 50%; animation: spin 0.8s linear infinite; margin: 0 auto 1rem;"></div>
+      <p style="font-size: 1rem; color: var(--foreground); font-weight: 600;">Carregando dados...</p>
+      <p style="font-size: 0.8rem; color: var(--muted-foreground); margin-top: 0.25rem;">Processando planilhas Excel</p>
+    </div>
+  </div>
+  <style>@keyframes spin {{ to {{ transform: rotate(360deg); }} }}</style>
+
+  <!-- Top Sticky Navigation -->
+  <header class="header-nav">
+    <div class="max-container" style="display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 1.5rem; padding-top: 0.75rem; padding-bottom: 0.75rem;">
+      <div style="display: flex; align-items: center; gap: 0.625rem;">
+        <span style="display: flex; width: 2.1rem; height: 2.1rem; align-items: center; justify-content: center; border-radius: 0.375rem; background: rgba(74, 222, 128, 0.15); border: 1px solid rgba(74, 222, 128, 0.3); color: var(--primary);">
+          <!-- Flaticon Style: Shopping Bag / Cesta e Mix de Produtos -->
+          <svg class="icon" style="width: 1.15rem; height: 1.15rem;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z"/><path d="M3 6h18"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>
+        </span>
+        <div style="line-height: 1.25;">
+          <p style="font-size: 0.875rem; font-weight: 600; color: var(--foreground);">Mix de Produtos</p>
+          <p class="num" style="font-size: 11px; color: var(--muted-foreground);" id="header-periodo">Carregando...</p>
+        </div>
+      </div>
+      <nav style="display: flex; flex-wrap: wrap; align-items: center; gap: 0.25rem; font-size: 0.75rem;">
+        <a href="#visao-geral" style="padding: 0.375rem 0.625rem; border-radius: 0.25rem; font-weight: 500; color: var(--muted-foreground); text-decoration: none; transition: all 0.15s;">Visão geral</a>
+        <a href="#grupos" style="padding: 0.375rem 0.625rem; border-radius: 0.25rem; font-weight: 500; color: var(--muted-foreground); text-decoration: none; transition: all 0.15s;">Grupos</a>
+        <a href="#produtos" style="padding: 0.375rem 0.625rem; border-radius: 0.25rem; font-weight: 500; color: var(--muted-foreground); text-decoration: none; transition: all 0.15s;">Produtos</a>
+        <a href="#abc" style="padding: 0.375rem 0.625rem; border-radius: 0.25rem; font-weight: 500; color: var(--muted-foreground); text-decoration: none; transition: all 0.15s;">Curva ABC</a>
+        <a href="#kits" style="padding: 0.375rem 0.625rem; border-radius: 0.25rem; font-weight: 600; color: var(--primary); text-decoration: none; transition: all 0.15s; background: rgba(74, 222, 128, 0.1);">Inteligência de Kits</a>
+        <a href="#filiais" style="padding: 0.375rem 0.625rem; border-radius: 0.25rem; font-weight: 500; color: var(--muted-foreground); text-decoration: none; transition: all 0.15s;">Filiais</a>
+        <a href="#vendedores" style="padding: 0.375rem 0.625rem; border-radius: 0.25rem; font-weight: 500; color: var(--muted-foreground); text-decoration: none; transition: all 0.15s;">Vendedores</a>
+        <a href="#campanhas" style="padding: 0.375rem 0.625rem; border-radius: 0.25rem; font-weight: 500; color: var(--muted-foreground); text-decoration: none; transition: all 0.15s;">Campanhas</a>
+      </nav>
+    </div>
+  </header>
+
+  <!-- Main Content -->
+  <main class="max-container" style="padding-top: 2.5rem; padding-bottom: 4rem;">
+
+    <!-- Seção 1: Visão Geral -->
+    <section id="visao-geral" class="section-spacing">
+      <div style="display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 1.5rem; margin-bottom: 1.5rem;">
+        <div style="max-width: 48rem;">
+          <p style="font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.2em; color: var(--primary);">Relatório executivo</p>
+          <h1 style="font-size: 2rem; font-weight: 700; color: var(--foreground); margin-top: 0.5rem; font-family: 'Manrope', sans-serif;">Análise de grupos e produtos vendidos no Mix</h1>
+          <p style="font-size: 0.875rem; color: var(--muted-foreground); margin-top: 0.75rem; line-height: 1.6;">
+            Desempenho consolidado da modalidade Mix de Produtos por grupo, produto, filial, vendedor e inteligência estratégica para estruturação de Kits comerciais.
+          </p>
+        </div>
+        <p class="num" style="font-size: 0.75rem; color: var(--muted-foreground);" id="info-gerado-em">Carregando...</p>
+      </div>
+
+      <!-- Filter Bar -->
+      <div class="panel" style="padding: 1rem 1.25rem; margin-bottom: 1.5rem; display: flex; flex-wrap: wrap; align-items: flex-end; gap: 1rem;">
+        <label style="display: flex; flex-direction: column; gap: 0.375rem;">
+          <span style="font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.14em; color: var(--muted-foreground);">Período inicial</span>
+          <input type="date" id="filtro-inicio">
+        </label>
+        <label style="display: flex; flex-direction: column; gap: 0.375rem;">
+          <span style="font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.14em; color: var(--muted-foreground);">Período final</span>
+          <input type="date" id="filtro-fim">
+        </label>
+        <label style="display: flex; flex-direction: column; gap: 0.375rem;">
+          <span style="font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.14em; color: var(--muted-foreground);">Filial</span>
+          <select id="filtro-filial"><option value="">Todos</option></select>
+        </label>
+        <label style="display: flex; flex-direction: column; gap: 0.375rem;">
+          <span style="font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.14em; color: var(--muted-foreground);">Campanha</span>
+          <select id="filtro-campanha"><option value="">Todos</option></select>
+        </label>
+        <label style="display: flex; flex-direction: column; gap: 0.375rem;">
+          <span style="font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.14em; color: var(--muted-foreground);">Grupo</span>
+          <select id="filtro-grupo"><option value="">Todos</option></select>
+        </label>
+        <button type="button" class="btn" id="btn-limpar-filtros">
+          <!-- Flaticon Style: Refresh / Reset -->
+          <svg class="icon" viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
+          Limpar filtros
+        </button>
+        <span class="num" id="contador-registros" style="margin-left: auto; font-size: 0.75rem; color: var(--muted-foreground);"></span>
+      </div>
+
+      <!-- KPI Grid (8 cards balanceados com valores exatos com centavos) -->
+      <div class="grid-kpis" style="margin-bottom: 1.5rem;">
+        <!-- Receita Total (Vendas) com centavos exatos -->
+        <div class="panel" style="padding: 1rem 1.25rem;">
+          <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+            <p style="font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.14em; color: var(--muted-foreground);">Receita total (Vendas)</p>
+            <!-- Flaticon Style: Money / Bill -->
+            <svg class="icon icon-primary" viewBox="0 0 24 24"><rect width="20" height="12" x="2" y="6" rx="2"/><circle cx="12" cy="12" r="2"/><path d="M6 12h.01M18 12h.01"/></svg>
+          </div>
+          <p class="num" id="kpi-receita" style="font-size: 1.4rem; font-weight: 700; color: var(--foreground); margin-top: 0.75rem;">R$ 0,00</p>
+        </div>
+        <!-- Ticket Médio Pedido com centavos exatos -->
+        <div class="panel" style="padding: 1rem 1.25rem;">
+          <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+            <p style="font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.14em; color: var(--muted-foreground);">Ticket médio / pedido</p>
+            <!-- Flaticon Style: Price Tag / Receipt -->
+            <svg class="icon icon-gold" viewBox="0 0 24 24"><path d="M19 7V4a1 1 0 0 0-1-1H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v4h-3a2 2 0 0 0 0 4h3a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1"/><path d="M3 5v14a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-4"/></svg>
+          </div>
+          <p class="num" id="kpi-ticket" style="font-size: 1.4rem; font-weight: 700; color: var(--foreground); margin-top: 0.75rem;">R$ 0,00</p>
+        </div>
+        <!-- Ticket Médio Cooperado com centavos exatos -->
+        <div class="panel" style="padding: 1rem 1.25rem;">
+          <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+            <p style="font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.14em; color: var(--muted-foreground);">Ticket médio / cooperado</p>
+            <!-- Flaticon Style: Coin / Investor -->
+            <svg class="icon icon-gold" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M16 8h-6a2 2 0 1 0 0 4h4a2 2 0 1 1 0 4H8"/><path d="M12 18V6"/></svg>
+          </div>
+          <p class="num" id="kpi-ticket-cooperado" style="font-size: 1.4rem; font-weight: 700; color: var(--foreground); margin-top: 0.75rem;">R$ 0,00</p>
+        </div>
+        <!-- Quantidade Total com decimais exatos -->
+        <div class="panel" style="padding: 1rem 1.25rem;">
+          <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+            <p style="font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.14em; color: var(--muted-foreground);">Quantidade total</p>
+            <!-- Flaticon Style: Box / Inventory -->
+            <svg class="icon icon-primary" viewBox="0 0 24 24"><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5M12 22V12"/></svg>
+          </div>
+          <p class="num" id="kpi-volume" style="font-size: 1.4rem; font-weight: 700; color: var(--foreground); margin-top: 0.75rem;">0</p>
+        </div>
+        <!-- Pedidos -->
+        <div class="panel" style="padding: 1rem 1.25rem;">
+          <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+            <p style="font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.14em; color: var(--muted-foreground);">Pedidos</p>
+            <!-- Flaticon Style: Invoice / Order -->
+            <svg class="icon icon-primary" viewBox="0 0 24 24"><path d="M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1-2 1Z"/><path d="M14 8H8M16 12H8M13 16H8"/></svg>
+          </div>
+          <p class="num" id="kpi-pedidos" style="font-size: 1.4rem; font-weight: 700; color: var(--foreground); margin-top: 0.75rem;">0</p>
+        </div>
+        <!-- Cooperados -->
+        <div class="panel" style="padding: 1rem 1.25rem;">
+          <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+            <p style="font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.14em; color: var(--muted-foreground);">Cooperados</p>
+            <!-- Flaticon Style: Users / Community -->
+            <svg class="icon icon-primary" viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+          </div>
+          <p class="num" id="kpi-cooperados" style="font-size: 1.4rem; font-weight: 700; color: var(--foreground); margin-top: 0.75rem;">0</p>
+        </div>
+        <!-- Produtos -->
+        <div class="panel" style="padding: 1rem 1.25rem;">
+          <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+            <p style="font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.14em; color: var(--muted-foreground);">Produtos</p>
+            <!-- Flaticon Style: Product / Package Grid -->
+            <svg class="icon icon-primary" viewBox="0 0 24 24"><path d="m7.5 4.27 9 5.15M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5M12 22V12"/></svg>
+          </div>
+          <p class="num" id="kpi-produtos" style="font-size: 1.4rem; font-weight: 700; color: var(--foreground); margin-top: 0.75rem;">0</p>
+        </div>
+        <!-- Média de Produtos por Mix (Arredondado para mais como número inteiro) -->
+        <div class="panel" style="padding: 1rem 1.25rem;">
+          <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+            <p style="font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.14em; color: var(--muted-foreground);">Média produtos / Mix</p>
+            <!-- Flaticon Style: Shopping Basket / Product Mix Combo -->
+            <svg class="icon icon-primary" viewBox="0 0 24 24"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z"/><path d="M3 6h18"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>
+          </div>
+          <p class="num" id="kpi-media-mix" style="font-size: 1.4rem; font-weight: 700; color: var(--foreground); margin-top: 0.75rem;">0</p>
+        </div>
+      </div>
+
+      <!-- Evolução da Receita -->
+      <div class="panel">
+        <div style="padding: 1rem 1.25rem; border-bottom: 1px solid var(--border);">
+          <h3 style="font-size: 0.875rem; font-weight: 600; color: var(--foreground);">Evolução da receita</h3>
+          <p style="font-size: 0.75rem; color: var(--muted-foreground); margin-top: 0.125rem;">Valor total faturado por data de pedido</p>
+        </div>
+        <div class="chart-container-padded" style="height: 260px;">
+          <canvas id="chartTrend"></canvas>
+        </div>
+      </div>
+    </section>
+
+    <!-- Seção 2: Grupos de Produto -->
+    <section id="grupos" class="section-spacing">
+      <div style="margin-bottom: 1.5rem; max-width: 48rem;">
+        <p style="font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.2em; color: var(--primary);">Mix</p>
+        <h2 style="font-size: 1.5rem; font-weight: 600; color: var(--foreground); margin-top: 0.5rem; font-family: 'Manrope', sans-serif;">Análise por grupo de produto</h2>
+        <p style="font-size: 0.875rem; color: var(--muted-foreground); margin-top: 0.5rem;">Distribuição de receita e quantidade entre os grupos (ordenados em ordem decrescente).</p>
+      </div>
+
+      <div class="grid-2cols" style="margin-bottom: 1rem;">
+        <div class="panel">
+          <div style="padding: 1rem 1.25rem; border-bottom: 1px solid var(--border);">
+            <h3 style="font-size: 0.875rem; font-weight: 600; color: var(--foreground);">Receita por grupo (Decrescente)</h3>
+          </div>
+          <div class="chart-container-padded" style="height: 290px;">
+            <canvas id="chartGruposReceita"></canvas>
+          </div>
+        </div>
+        <div class="panel">
+          <div style="padding: 1rem 1.25rem; border-bottom: 1px solid var(--border);">
+            <h3 style="font-size: 0.875rem; font-weight: 600; color: var(--foreground);">Quantidade por grupo (Decrescente)</h3>
+          </div>
+          <div class="chart-container-padded" style="height: 290px;">
+            <canvas id="chartGruposVolume"></canvas>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="data-table-container">
+          <table class="data-table" id="tblGrupos">
+            <thead>
+              <tr>
+                <th style="width: 50px;">#</th>
+                <th>Grupo</th>
+                <th class="text-right">Receita (Vendas)</th>
+                <th class="text-right">Quantidade</th>
+                <th class="text-right">Ticket médio</th>
+                <th class="text-right">Share</th>
+                <th class="text-right">Pedidos</th>
+                <th class="text-right">Cooperados</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- Seção 3: Produtos Vendidos -->
+    <section id="produtos" class="section-spacing">
+      <div style="margin-bottom: 1.5rem; max-width: 48rem;">
+        <p style="font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.2em; color: var(--primary);">Portfólio</p>
+        <h2 style="font-size: 1.5rem; font-weight: 600; color: var(--foreground); margin-top: 0.5rem; font-family: 'Manrope', sans-serif;">Produtos vendidos</h2>
+        <p style="font-size: 0.875rem; color: var(--muted-foreground); margin-top: 0.5rem;">Os cinco produtos de maior receita e quantidade, seguidos da tabela completa do período com exportação para Excel.</p>
+      </div>
+
+      <div class="grid-2cols" style="margin-bottom: 1rem;">
+        <div class="panel">
+          <div style="padding: 1rem 1.25rem; border-bottom: 1px solid var(--border);">
+            <h3 style="font-size: 0.875rem; font-weight: 600; color: var(--foreground);">Top 5 por receita (Decrescente)</h3>
+          </div>
+          <div class="chart-container-padded" style="height: 270px;">
+            <canvas id="chartTop5Receita"></canvas>
+          </div>
+        </div>
+        <div class="panel">
+          <div style="padding: 1rem 1.25rem; border-bottom: 1px solid var(--border);">
+            <h3 style="font-size: 0.875rem; font-weight: 600; color: var(--foreground);">Top 5 por quantidade (Decrescente)</h3>
+          </div>
+          <div class="chart-container-padded" style="height: 270px;">
+            <canvas id="chartTop5Volume"></canvas>
+          </div>
+        </div>
+      </div>
+
+      <!-- Box Explicativo da Coluna "Acumulado" e Conceito de Receita -->
+      <div class="info-box" style="margin-bottom: 1rem;">
+        <div style="display: flex; align-items: flex-start; gap: 0.625rem;">
+          <span style="color: var(--primary); font-size: 1.05rem; line-height: 1;">
+            <!-- Flaticon Style: Lightbulb / Info -->
+            <svg class="icon icon-primary" viewBox="0 0 24 24"><path d="M15 14c.2-1 .7-1.7 1.5-2.5 1-.9 1.5-2.2 1.5-3.5A6 6 0 0 0 6 8c0 1 .2 2.2 1.5 3.5.7.7 1.3 1.5 1.5 2.5"/><path d="M9 18h6"/><path d="M10 22h4"/></svg>
+          </span>
+          <div>
+            <strong style="color: var(--foreground);">O que é a coluna "Acumulado"?</strong>
+            <span style="margin-left: 0.25rem;">
+              Ela informa o percentual progressivo da receita acumulada no Mix de Produtos (Princípio de Pareto). 
+              Ao somar as vendas do item líder aos seguintes, ela determina a classificação do produto: 
+              <span class="badge badge-a" style="vertical-align: middle; margin: 0 0.2rem;">Classe A</span> até 80% da receita total; 
+              <span class="badge badge-b" style="vertical-align: middle; margin: 0 0.2rem;">Classe B</span> de 80% até 95%; e 
+              <span class="badge badge-c" style="vertical-align: middle; margin: 0 0.2rem;">Classe C</span> os 5% finais. 
+              <em style="color: var(--foreground);">A coluna Receita reflete o valor exato total faturado no período.</em>
+            </span>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div style="padding: 1rem 1.25rem; border-bottom: 1px solid var(--border); display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 1rem;">
+          <div>
+            <h3 style="font-size: 0.875rem; font-weight: 600; color: var(--foreground);">Tabela completa de produtos</h3>
+            <p id="subtitulo-tabela-produtos" style="font-size: 0.75rem; color: var(--muted-foreground); margin-top: 0.125rem;">0 produtos no período filtrado</p>
+          </div>
+          <!-- Botão Oficial de Exportação para Excel -->
+          <button type="button" class="btn btn-export" id="btn-exportar-excel">
+            <!-- Flaticon Style: File Excel / Download -->
+            <svg class="icon" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>
+            Exportar para Excel (.xlsx)
+          </button>
+        </div>
+        <!-- Tabela sem barra de rolagem horizontal -->
+        <div class="data-table-container" style="max-height: 580px; overflow-y: auto;">
+          <table class="data-table" id="tblProdutos">
+            <thead>
+              <tr>
+                <th style="width: 46px;">#</th>
+                <th style="width: 54px;">ABC</th>
+                <th style="min-width: 240px;">Produto</th>
+                <th class="text-right" style="width: 135px;">Receita (Vendas)</th>
+                <th class="text-right" style="width: 95px;">Quantidade</th>
+                <th class="text-right" style="width: 100px;">Share</th>
+                <th class="text-right" style="width: 95px;" title="Percentual acumulado da receita total">Acumulado</th>
+                <th class="text-right" style="width: 75px;">Pedidos</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- Seção 4: Curva ABC / Pareto com 3 Tabelas Dedicadas -->
+    <section id="abc" class="section-spacing">
+      <div style="margin-bottom: 1.5rem; max-width: 48rem;">
+        <p style="font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.2em; color: var(--primary);">Pareto 80/20</p>
+        <h2 style="font-size: 1.5rem; font-weight: 600; color: var(--foreground); margin-top: 0.5rem; font-family: 'Manrope', sans-serif;">Curva ABC de produtos</h2>
+        <p style="font-size: 0.875rem; color: var(--muted-foreground); margin-top: 0.5rem;">
+          As barras representam a receita individual de cada produto (ordenada do maior para o menor sem corte de texto); a linha dourada acompanha o percentual acumulado. Abaixo, tabelas detalhadas para cada curva (A, B e C).
+        </p>
+      </div>
+
+      <!-- 3 Cards Informativos com centavos exatos -->
+      <div class="grid-3cols" style="margin-bottom: 1rem;">
+        <div class="panel" style="padding: 1rem 1.25rem;">
+          <div style="display: flex; align-items: center; gap: 0.5rem;">
+            <span class="badge badge-a">A</span>
+            <span class="num" id="abc-count-a" style="font-size: 0.875rem; font-weight: 600; color: var(--foreground);">0 produtos</span>
+            <span class="num" id="abc-val-a" style="margin-left: auto; font-size: 0.875rem; font-weight: 600; color: var(--primary);">R$ 0,00</span>
+          </div>
+          <p style="margin-top: 0.5rem; font-size: 0.75rem; color: var(--muted-foreground); line-height: 1.5;">Até 80% da receita acumulada — itens estratégicos de maior impacto.</p>
+        </div>
+        <div class="panel" style="padding: 1rem 1.25rem;">
+          <div style="display: flex; align-items: center; gap: 0.5rem;">
+            <span class="badge badge-b">B</span>
+            <span class="num" id="abc-count-b" style="font-size: 0.875rem; font-weight: 600; color: var(--foreground);">0 produtos</span>
+            <span class="num" id="abc-val-b" style="margin-left: auto; font-size: 0.875rem; font-weight: 600; color: var(--gold);">R$ 0,00</span>
+          </div>
+          <p style="margin-top: 0.5rem; font-size: 0.75rem; color: var(--muted-foreground); line-height: 1.5;">De 80% a 95% da receita — itens de importância intermediária.</p>
+        </div>
+        <div class="panel" style="padding: 1rem 1.25rem;">
+          <div style="display: flex; align-items: center; gap: 0.5rem;">
+            <span class="badge badge-c">C</span>
+            <span class="num" id="abc-count-c" style="font-size: 0.875rem; font-weight: 600; color: var(--foreground);">0 produtos</span>
+            <span class="num" id="abc-val-c" style="margin-left: auto; font-size: 0.875rem; font-weight: 600; color: var(--muted-foreground);">R$ 0,00</span>
+          </div>
+          <p style="margin-top: 0.5rem; font-size: 0.75rem; color: var(--muted-foreground); line-height: 1.5;">Últimos 5% da receita — itens de giro menor ou complementar.</p>
+        </div>
+      </div>
+
+      <!-- Gráfico Pareto (Top 10 Produtos sem cortes) -->
+      <div class="panel" style="margin-bottom: 1.5rem;">
+        <div style="padding: 1rem 1.25rem; border-bottom: 1px solid var(--border);">
+          <h3 style="font-size: 0.875rem; font-weight: 600; color: var(--foreground);">Receita individual e acumulada</h3>
+          <p style="font-size: 0.75rem; color: var(--muted-foreground); margin-top: 0.125rem;">Top 10 principais produtos em vendas (ordenados decrescentemente)</p>
+        </div>
+        <div class="chart-container-padded" style="height: 360px;">
+          <canvas id="chartPareto"></canvas>
+        </div>
+      </div>
+
+      <!-- 3 Tabelas Dedicadas por Curva ABC -->
+      <div class="panel">
+        <div style="padding: 1rem 1.25rem; border-bottom: 1px solid var(--border); display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 1rem;">
+          <div>
+            <h3 style="font-size: 0.875rem; font-weight: 600; color: var(--foreground);">Detalhamento de produtos por Curva ABC</h3>
+            <p style="font-size: 0.75rem; color: var(--muted-foreground); margin-top: 0.125rem;">Selecione a curva para analisar os produtos de cada estrato:</p>
+          </div>
+          <!-- Abas de Curvas -->
+          <div style="display: flex; gap: 0.375rem; background: var(--surface-2); padding: 0.25rem; border-radius: 8px; border: 1px solid var(--border);">
+            <button type="button" class="tab-btn active" id="tab-btn-a" onclick="switchAbcTab('A')">
+              <span class="badge badge-a">A</span> <span id="tab-label-a">Classe A</span>
+            </button>
+            <button type="button" class="tab-btn" id="tab-btn-b" onclick="switchAbcTab('B')">
+              <span class="badge badge-b">B</span> <span id="tab-label-b">Classe B</span>
+            </button>
+            <button type="button" class="tab-btn" id="tab-btn-c" onclick="switchAbcTab('C')">
+              <span class="badge badge-c">C</span> <span id="tab-label-c">Classe C</span>
+            </button>
+          </div>
+        </div>
+
+        <div class="data-table-container" style="max-height: 480px; overflow-y: auto;">
+          <table class="data-table" id="tblAbcDetalhe">
+            <thead>
+              <tr>
+                <th style="width: 46px;">#</th>
+                <th style="width: 54px;">ABC</th>
+                <th style="min-width: 240px;">Produto</th>
+                <th class="text-right" style="width: 135px;">Receita (Vendas)</th>
+                <th class="text-right" style="width: 95px;">Quantidade</th>
+                <th class="text-right" style="width: 100px;">Share</th>
+                <th class="text-right" style="width: 95px;">Acumulado</th>
+                <th class="text-right" style="width: 75px;">Pedidos</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- Seção: Inteligência para Montagem de Kits com Ícones Flaticon e Texto Atualizado -->
+    <section id="kits" class="section-spacing">
+      <div style="margin-bottom: 1.5rem; max-width: 54rem;">
+        <p style="font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.2em; color: var(--primary);">Estratégia Comercial</p>
+        <h2 style="font-size: 1.5rem; font-weight: 600; color: var(--foreground); margin-top: 0.5rem; font-family: 'Manrope', sans-serif;">Inteligência para montagem de Kits comerciais</h2>
+        <!-- Texto Oficial Reescrito Conforme Solicitação -->
+        <p style="font-size: 0.875rem; color: var(--muted-foreground); margin-top: 0.5rem; line-height: 1.6;">
+          Análise de grupos e produtos que possuem maior representatividade financeira por pedido para criar Kits de alta conversão. Combine itens de alto ticket (âncoras) com itens agregadores de margem e giro técnico.
+        </p>
+      </div>
+
+      <!-- Guia Visual para a Gestão com Ícones Oficiais Flaticon -->
+      <div class="grid-3cols" style="margin-bottom: 1.25rem;">
+        <!-- Card 1: Âncora de Valor com Ícone Flaticon Âncora -->
+        <div class="kit-guide-box">
+          <div style="display: flex; align-items: center; gap: 0.625rem;">
+            <span class="icon-flaticon-box" style="background: rgba(74, 222, 128, 0.15); border: 1px solid rgba(74, 222, 128, 0.35);">
+              <!-- Flaticon Style: Anchor -->
+              <svg class="icon icon-primary" viewBox="0 0 24 24"><circle cx="12" cy="5" r="3"/><line x1="12" y1="22" x2="12" y2="8"/><path d="M5 12H2a10 10 0 0 0 20 0h-3"/></svg>
+            </span>
+            <div>
+              <span class="badge badge-kit-ancora">Âncora</span>
+              <strong style="color: var(--primary); font-size: 0.85rem; display: block; margin-top: 0.15rem;">Produto/Grupo Âncora</strong>
+            </div>
+          </div>
+          <p style="font-size: 0.78rem; color: var(--muted-foreground); margin-top: 0.625rem; line-height: 1.45;">
+            <strong>Ticket alto por pedido</strong>. É a base financeira do Kit (ex: Fertilizante de Solo ou Defensivo forte) que viabiliza o pedido do produtor.
+          </p>
+        </div>
+
+        <!-- Card 2: Agregador de Margem com Ícone Flaticon Raio/Energia -->
+        <div class="kit-guide-box">
+          <div style="display: flex; align-items: center; gap: 0.625rem;">
+            <span class="icon-flaticon-box" style="background: rgba(245, 200, 66, 0.15); border: 1px solid rgba(245, 200, 66, 0.35);">
+              <!-- Flaticon Style: Lightning / Bolt -->
+              <svg class="icon icon-gold" viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+            </span>
+            <div>
+              <span class="badge badge-kit-agregador">Agregador</span>
+              <strong style="color: var(--gold); font-size: 0.85rem; display: block; margin-top: 0.15rem;">Agregador de Margem</strong>
+            </div>
+          </div>
+          <p style="font-size: 0.78rem; color: var(--muted-foreground); margin-top: 0.625rem; line-height: 1.45;">
+            <strong>Ticket médio moderado</strong>. Entra no combo para elevar a eficiência da lavoura (ex: Foliar, Adjuvante, Biológico) e aumentar o lucro da cooperativa.
+          </p>
+        </div>
+
+        <!-- Card 3: Giro e Entrada com Ícone Flaticon Pacote/Caixa -->
+        <div class="kit-guide-box">
+          <div style="display: flex; align-items: center; gap: 0.625rem;">
+            <span class="icon-flaticon-box" style="background: rgba(56, 189, 248, 0.15); border: 1px solid rgba(56, 189, 248, 0.35);">
+              <!-- Flaticon Style: Package / Box -->
+              <svg class="icon icon-cyan" viewBox="0 0 24 24"><path d="M16.5 9.4 7.55 4.24a1.78 1.78 0 0 0-2.5 1.55v12.42a1.78 1.78 0 0 0 2.5 1.55L16.5 14.6a1.78 1.78 0 0 0 0-3.2Z"/><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><polyline points="3.29 7 12 12 20.71 7"/><line x1="12" y1="22" x2="12" y2="12"/></svg>
+            </span>
+            <div>
+              <span class="badge badge-kit-giro">Giro</span>
+              <strong style="color: var(--cyan); font-size: 0.85rem; display: block; margin-top: 0.15rem;">Giro e Entrada</strong>
+            </div>
+          </div>
+          <p style="font-size: 0.78rem; color: var(--muted-foreground); margin-top: 0.625rem; line-height: 1.45;">
+            <strong>Ticket menor ou complementar</strong>. Excelente para compor pacotes promocionais de entrada ou estimular o primeiro pedido do cooperado no Mix.
+          </p>
+        </div>
+      </div>
+
+      <!-- 2 Gráficos de Ticket Médio por Pedido -->
+      <div class="grid-2cols" style="margin-bottom: 1.25rem;">
+        <!-- Gráfico 1: Ticket Médio de Grupo por Pedido -->
+        <div class="panel">
+          <div style="padding: 1rem 1.25rem; border-bottom: 1px solid var(--border);">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+              <h3 style="font-size: 0.875rem; font-weight: 600; color: var(--foreground);">Ticket Médio de Grupo por Pedido</h3>
+              <span style="font-size: 11px; color: var(--muted-foreground);">Quanto o grupo fatura quando entra no pedido</span>
+            </div>
+          </div>
+          <div class="chart-container-padded" style="height: 310px;">
+            <canvas id="chartKitsGruposTicket"></canvas>
+          </div>
+        </div>
+
+        <!-- Gráfico 2: Top 10 Produtos por Ticket Médio por Pedido -->
+        <div class="panel">
+          <div style="padding: 1rem 1.25rem; border-bottom: 1px solid var(--border);">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+              <h3 style="font-size: 0.875rem; font-weight: 600; color: var(--foreground);">Top 10 Produtos por Ticket Médio / Pedido</h3>
+              <span style="font-size: 11px; color: var(--muted-foreground);">Os produtos de maior valor unitário no pedido</span>
+            </div>
+          </div>
+          <div class="chart-container-padded" style="height: 310px;">
+            <canvas id="chartKitsProdutosTicket"></canvas>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tabela Estratégica de Classificação para Kits -->
+      <div class="panel">
+        <div style="padding: 1rem 1.25rem; border-bottom: 1px solid var(--border); display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 1rem;">
+          <div>
+            <h3 style="font-size: 0.875rem; font-weight: 600; color: var(--foreground);">Matriz de Classificação de Produtos para Kits</h3>
+            <p style="font-size: 0.75rem; color: var(--muted-foreground); margin-top: 0.125rem;">
+              Classificação automática sugerida conforme o ticket médio por pedido e a representatividade no período
+            </p>
+          </div>
+          <!-- Seletor de Grupo para filtrar os produtos da matriz -->
+          <div style="display: flex; align-items: center; gap: 0.5rem;">
+            <span style="font-size: 0.75rem; color: var(--muted-foreground);">Filtrar grupo:</span>
+            <select id="filtro-kits-grupo" style="height: 2rem; font-size: 0.78rem;">
+              <option value="">Todos os grupos</option>
+            </select>
+          </div>
+        </div>
+        <div class="data-table-container" style="max-height: 480px; overflow-y: auto;">
+          <table class="data-table" id="tblKitsClassificacao">
+            <thead>
+              <tr>
+                <th style="width: 46px;">#</th>
+                <th style="min-width: 220px;">Produto</th>
+                <th style="width: 140px;">Grupo</th>
+                <th class="text-right" style="width: 155px;">Ticket Médio / Pedido</th>
+                <th class="text-right" style="width: 80px;">Pedidos</th>
+                <th class="text-right" style="width: 140px;">Receita Total (Vendas)</th>
+                <th style="width: 185px;">Papel Sugerido no Kit</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- Seção 5: Filiais -->
+    <section id="filiais" class="section-spacing">
+      <div style="margin-bottom: 1.5rem; max-width: 48rem;">
+        <p style="font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.2em; color: var(--primary);">Rede</p>
+        <h2 style="font-size: 1.5rem; font-weight: 600; color: var(--foreground); margin-top: 0.5rem; font-family: 'Manrope', sans-serif;">Análise por filial</h2>
+        <p style="font-size: 0.875rem; color: var(--muted-foreground); margin-top: 0.5rem;">Comparativo de receita, quantidade e ticket médio entre as unidades (ordenadas decrescentemente).</p>
+      </div>
+
+      <div class="grid-2cols" style="margin-bottom: 1rem;">
+        <div class="panel">
+          <div style="padding: 1rem 1.25rem; border-bottom: 1px solid var(--border);">
+            <h3 style="font-size: 0.875rem; font-weight: 600; color: var(--foreground);">Receita por filial (Decrescente)</h3>
+          </div>
+          <div class="chart-container-padded" style="height: 300px;">
+            <canvas id="chartFiliaisReceita"></canvas>
+          </div>
+        </div>
+        <div class="panel">
+          <div style="padding: 1rem 1.25rem; border-bottom: 1px solid var(--border);">
+            <h3 style="font-size: 0.875rem; font-weight: 600; color: var(--foreground);">Quantidade por filial (Decrescente)</h3>
+          </div>
+          <div class="chart-container-padded" style="height: 300px;">
+            <canvas id="chartFiliaisVolume"></canvas>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="data-table-container">
+          <table class="data-table" id="tblFiliais">
+            <thead>
+              <tr>
+                <th style="width: 50px;">#</th>
+                <th>Filial</th>
+                <th class="text-right">Receita (Vendas)</th>
+                <th class="text-right">Quantidade</th>
+                <th class="text-right">Ticket médio</th>
+                <th class="text-right">Share</th>
+                <th class="text-right">Pedidos</th>
+                <th class="text-right">Cooperados</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- Seção 6: Vendedores -->
+    <section id="vendedores" class="section-spacing">
+      <div style="margin-bottom: 1.5rem; max-width: 48rem;">
+        <p style="font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.2em; color: var(--primary);">Equipe comercial</p>
+        <h2 style="font-size: 1.5rem; font-weight: 600; color: var(--foreground); margin-top: 0.5rem; font-family: 'Manrope', sans-serif;">Análise por vendedor</h2>
+        <p style="font-size: 0.875rem; color: var(--muted-foreground); margin-top: 0.5rem;">Receita gerada, carteira de cooperados atendidos e participação no total (ordenados decrescentemente).</p>
+      </div>
+
+      <div class="grid-2cols" style="margin-bottom: 1rem;">
+        <div class="panel">
+          <div style="padding: 1rem 1.25rem; border-bottom: 1px solid var(--border);">
+            <h3 style="font-size: 0.875rem; font-weight: 600; color: var(--foreground);">Receita por vendedor (Decrescente)</h3>
+          </div>
+          <div class="chart-container-padded" style="height: 340px;">
+            <canvas id="chartVendedoresReceita"></canvas>
+          </div>
+        </div>
+        <div class="panel">
+          <div style="padding: 1rem 1.25rem; border-bottom: 1px solid var(--border);">
+            <h3 style="font-size: 0.875rem; font-weight: 600; color: var(--foreground);">Quantidade por vendedor (Decrescente)</h3>
+          </div>
+          <div class="chart-container-padded" style="height: 340px;">
+            <canvas id="chartVendedoresVolume"></canvas>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="data-table-container">
+          <table class="data-table" id="tblVendedores">
+            <thead>
+              <tr>
+                <th style="width: 50px;">#</th>
+                <th>Vendedor</th>
+                <th class="text-right">Receita (Vendas)</th>
+                <th class="text-right">Quantidade</th>
+                <th class="text-right">Ticket médio</th>
+                <th class="text-right">Share</th>
+                <th class="text-right">Pedidos</th>
+                <th class="text-right">Cooperados</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- Seção 7: Campanhas -->
+    <section id="campanhas" class="section-spacing">
+      <div style="margin-bottom: 1.5rem; max-width: 48rem;">
+        <p style="font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.2em; color: var(--primary);">Comercial</p>
+        <h2 style="font-size: 1.5rem; font-weight: 600; color: var(--foreground); margin-top: 0.5rem; font-family: 'Manrope', sans-serif;">Análise por campanha</h2>
+        <p style="font-size: 0.875rem; color: var(--muted-foreground); margin-top: 0.5rem;">Peso de cada campanha na receita do período e amplitude de produtos vendidos (ordenadas decrescentemente).</p>
+      </div>
+
+      <div class="grid-campanhas">
+        <div class="panel">
+          <div style="padding: 1rem 1.25rem; border-bottom: 1px solid var(--border);">
+            <h3 style="font-size: 0.875rem; font-weight: 600; color: var(--foreground);">Receita por campanha (Decrescente)</h3>
+          </div>
+          <div class="chart-container-padded" style="height: 260px;">
+            <canvas id="chartCampanhas"></canvas>
+          </div>
+        </div>
+        <div class="panel">
+          <div class="data-table-container">
+            <table class="data-table" id="tblCampanhas">
+              <thead>
+                <tr>
+                  <th style="width: 50px;">#</th>
+                  <th>Campanha</th>
+                  <th class="text-right">Receita (Vendas)</th>
+                  <th class="text-right">Quantidade</th>
+                  <th class="text-right">Share</th>
+                  <th class="text-right">Produtos</th>
+                  <th class="text-right">Pedidos</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Footer -->
+  <footer style="border-top: 1px solid var(--border); padding-top: 1.5rem; padding-bottom: 1.5rem;">
+    <div class="max-container" style="display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.5rem; font-size: 0.75rem; color: var(--muted-foreground);">
+      <span>Análise de Grupos e Produtos Vendidos no Mix</span>
+      <span class="num" id="footer-periodo">Carregando...</span>
+    </div>
+  </footer>
+
+  <script>
+    // DADOS — carregados via API do backend
+    let ALL_RECORDS = [];
+
+    async function carregarDados() {{
+      try {{
+        const resp = await fetch('/api/dados');
+        if (!resp.ok) throw new Error('Erro ao buscar dados: ' + resp.status);
+        const dados = await resp.json();
+
+        ALL_RECORDS = dados.records || [];
+
+        // Preencher metadados dinâmicos
+        const periodo = dados.dt_ini && dados.dt_fim ? `${{dados.dt_ini}} — ${{dados.dt_fim}}` : '';
+        const el_header = document.getElementById('header-periodo');
+        if (el_header) el_header.textContent = periodo;
+
+        const el_gerado = document.getElementById('info-gerado-em');
+        if (el_gerado) el_gerado.textContent = dados.agora ? `Gerado em ${{dados.agora}}` : '';
+
+        const el_footer = document.getElementById('footer-periodo');
+        if (el_footer) el_footer.textContent = periodo ? `Período ${{dados.dt_ini}} a ${{dados.dt_fim}} · gerado em ${{dados.agora}}` : '';
+
+        // Inicializar dashboard
+        populateFilterOptions();
+        applyFilters();
+
+        // Remover overlay de carregamento
+        const overlay = document.getElementById('loading-overlay');
+        if (overlay) overlay.remove();
+
+      }} catch (err) {{
+        console.error('Erro ao carregar dados:', err);
+        const overlay = document.getElementById('loading-overlay');
+        if (overlay) {{
+          overlay.innerHTML = `
+            <div style="text-align: center;">
+              <p style="font-size: 1.25rem; color: var(--destructive); margin-bottom: 0.5rem;">❌ Erro ao carregar dados</p>
+              <p style="font-size: 0.875rem; color: var(--muted-foreground);">${{err.message}}</p>
+              <button onclick="location.reload()" style="margin-top: 1rem; padding: 0.5rem 1.5rem; border-radius: 0.375rem; background: var(--primary); color: var(--primary-foreground); border: none; cursor: pointer; font-weight: 600;">Tentar novamente</button>
+            </div>`;
+        }}
+      }}
+    }}
+
+    // Formatadores com centavos exatos (sem arredondar)
+    const BRL = v => v.toLocaleString('pt-BR', {{ style: 'currency', currency: 'BRL', minimumFractionDigits: 2, maximumFractionDigits: 2 }});
+    const BRL_COMPACT = v => v >= 1000000 ? `${{(v/1000000).toFixed(2)}}M` : v >= 1000 ? `${{(v/1000).toFixed(1)}}k` : `${{v.toFixed(2)}}`;
+    const NUM = (v, d = 2) => v.toLocaleString('pt-BR', {{ minimumFractionDigits: d, maximumFractionDigits: d }});
+    const PCT = v => `${{v.toFixed(1)}}%`;
+    const compact = v => v >= 1000000 ? `${{(v/1000000).toFixed(1)}}M` : v >= 1000 ? `${{Math.round(v/1000)}}k` : `${{v}}`;
+    const short = (s, n = 28) => s.length > n ? `${{s.slice(0, n)}}…` : s;
+
+    function parseDate(str) {{
+      if (!str) return new Date(0);
+      const parts = str.split('/').map(Number);
+      return new Date(parts[2], parts[1] - 1, parts[0]);
+    }}
+
+    const PALETTE = ['#4ade80', '#f5c842', '#38bdf8', '#a3e635', '#fb923c', '#34d399', '#818cf8'];
+
+    let charts = {{}};
+    function destroyChart(key) {{
+      if (charts[key]) {{
+        charts[key].destroy();
+        delete charts[key];
+      }}
+    }}
+
+    // Configurações globais Chart.js
+    Chart.defaults.color = '#9dbca4';
+    Chart.defaults.font.family = "'Inter', system-ui, sans-serif";
+    Chart.defaults.font.size = 11;
+    Chart.defaults.plugins.tooltip.backgroundColor = 'rgba(20, 35, 25, 0.94)';
+    Chart.defaults.plugins.tooltip.borderColor = 'rgba(74, 222, 128, 0.35)';
+    Chart.defaults.plugins.tooltip.borderWidth = 1;
+    Chart.defaults.plugins.tooltip.padding = 10;
+    Chart.defaults.plugins.tooltip.cornerRadius = 8;
+    Chart.defaults.plugins.tooltip.titleColor = '#f1f7f2';
+    Chart.defaults.plugins.tooltip.bodyColor = '#f1f7f2';
+    Chart.defaults.plugins.legend.display = false;
+
+    let currentData = null;
+    let currentAbcTab = 'A';
+
+    function aggregate(recs) {{
+      const totalReceita = recs.reduce((s, r) => s + r.preco_total, 0);
+      const totalVolume = recs.reduce((s, r) => s + r.quantidade, 0);
+      const pedidosSet = new Set(recs.map(r => r.pedido));
+      const cooperadosSet = new Set(recs.map(r => r.matricula));
+      const produtosSet = new Set(recs.map(r => r.produto));
+      const gruposSet = new Set(recs.map(r => r.grupo));
+
+      // Média de produtos distintos por pedido de Mix (arredondado para mais como número inteiro)
+      const prodsPorPedido = new Map();
+      for (const r of recs) {{
+        if (!prodsPorPedido.has(r.pedido)) {{
+          prodsPorPedido.set(r.pedido, new Set());
+        }}
+        prodsPorPedido.get(r.pedido).add(r.produto);
+      }}
+      let somaProds = 0;
+      for (const set of prodsPorPedido.values()) {{
+        somaProds += set.size;
+      }}
+      const mediaProdutosMix = prodsPorPedido.size > 0 ? Math.ceil(somaProds / prodsPorPedido.size) : 0;
+
+      const kpis = {{
+        receitaTotal: totalReceita,
+        volumeTotal: totalVolume,
+        nPedidos: pedidosSet.size,
+        ticketMedio: pedidosSet.size ? totalReceita / pedidosSet.size : 0,
+        ticketCooperado: cooperadosSet.size ? totalReceita / cooperadosSet.size : 0,
+        nCooperados: cooperadosSet.size,
+        nProdutos: produtosSet.size,
+        nGrupos: gruposSet.size,
+        mediaProdutosMix: mediaProdutosMix,
+        nRegistros: recs.length
+      }};
+
+      function groupBy(keyFn) {{
+        const map = new Map();
+        for (const r of recs) {{
+          const k = keyFn(r);
+          let b = map.get(k);
+          if (!b) {{
+            b = {{ receita: 0, volume: 0, pedidos: new Set(), cooperados: new Set(), produtos: new Set(), grupo: r.grupo }};
+            map.set(k, b);
+          }}
+          b.receita += r.preco_total;
+          b.volume += r.quantidade;
+          b.pedidos.add(r.pedido);
+          b.cooperados.add(r.matricula);
+          b.produtos.add(r.produto);
+        }}
+        return [...map.entries()].map(([nome, b]) => ({{
+          nome,
+          grupo: b.grupo,
+          receita: b.receita,
+          volume: b.volume,
+          pedidos: b.pedidos.size,
+          cooperados: b.cooperados.size,
+          produtos: b.produtos.size,
+          share: totalReceita > 0 ? (b.receita / totalReceita) * 100 : 0,
+          ticket: b.pedidos.size ? b.receita / b.pedidos.size : 0
+        }}));
+      }}
+
+      const grupos = groupBy(r => r.grupo).sort((a, b) => b.receita - a.receita);
+      const produtos = groupBy(r => r.produto).sort((a, b) => b.receita - a.receita);
+      const filiais = groupBy(r => r.filial).sort((a, b) => b.receita - a.receita);
+      const vendedores = groupBy(r => r.vendedor).sort((a, b) => b.receita - a.receita);
+      const campanhas = groupBy(r => r.campanha).sort((a, b) => b.receita - a.receita);
+
+      // Curva ABC
+      let acum = 0;
+      for (const p of produtos) {{
+        acum += p.receita;
+        p.receitaAcumPct = totalReceita > 0 ? (acum / totalReceita) * 100 : 0;
+        p.classe = p.receitaAcumPct <= 80 ? 'A' : p.receitaAcumPct <= 95 ? 'B' : 'C';
+      }}
+
+      // Por dia
+      const diaMap = new Map();
+      for (const r of recs) {{
+        let b = diaMap.get(r.data);
+        if (!b) {{
+          b = {{ dia: r.data, receita: 0, pedidos: new Set() }};
+          diaMap.set(r.data, b);
+        }}
+        b.receita += r.preco_total;
+        b.pedidos.add(r.pedido);
+      }}
+      const porDia = [...diaMap.values()]
+        .map(b => ({{ dia: b.dia, receita: b.receita, pedidos: b.pedidos.size }}))
+        .sort((a, b) => parseDate(a.dia) - parseDate(b.dia));
+
+      return {{ kpis, grupos, produtos, filiais, vendedores, campanhas, porDia }};
+    }}
+
+    function renderDashboard(data) {{
+      currentData = data;
+      const {{ kpis, grupos, produtos, filiais, vendedores, campanhas, porDia }} = data;
+
+      // KPIs com centavos exatos
+      document.getElementById('kpi-receita').textContent = BRL(kpis.receitaTotal);
+      document.getElementById('kpi-ticket').textContent = BRL(kpis.ticketMedio);
+      document.getElementById('kpi-ticket-cooperado').textContent = BRL(kpis.ticketCooperado);
+      document.getElementById('kpi-volume').textContent = NUM(kpis.volumeTotal, 2);
+      document.getElementById('kpi-pedidos').textContent = kpis.nPedidos;
+      document.getElementById('kpi-cooperados').textContent = kpis.nCooperados;
+      document.getElementById('kpi-produtos').textContent = kpis.nProdutos;
+      const elMediaMix = document.getElementById('kpi-media-mix');
+      if (elMediaMix) elMediaMix.textContent = kpis.mediaProdutosMix;
+      const elGrupos = document.getElementById('kpi-grupos');
+      if (elGrupos) elGrupos.textContent = kpis.nGrupos;
+
+      // Trend Chart
+      destroyChart('trend');
+      charts['trend'] = new Chart(document.getElementById('chartTrend'), {{
+        type: 'line',
+        data: {{
+          labels: porDia.map(d => d.dia),
+          datasets: [{{
+            data: porDia.map(d => d.receita),
+            borderColor: '#4ade80',
+            backgroundColor: 'rgba(74, 222, 128, 0.12)',
+            borderWidth: 2.2,
+            pointRadius: 3.5,
+            pointHoverRadius: 6,
+            pointBackgroundColor: '#4ade80',
+            tension: 0.3,
+            fill: true
+          }}]
+        }},
+        options: {{
+          responsive: true,
+          maintainAspectRatio: false,
+          layout: {{ padding: {{ left: 10, right: 15, top: 10, bottom: 5 }} }},
+          plugins: {{ tooltip: {{ callbacks: {{ label: ctx => `Receita: ${{BRL(ctx.parsed.y)}}` }} }} }},
+          scales: {{
+            x: {{ grid: {{ display: false }}, ticks: {{ color: '#9dbca4' }} }},
+            y: {{ grid: {{ color: 'rgba(74, 222, 128, 0.08)' }}, ticks: {{ color: '#9dbca4', callback: compact }} }}
+          }}
+        }}
+      }});
+
+      // 1. Grupos de Produto
+      const gruposReceita = [...grupos].sort((a, b) => b.receita - a.receita);
+      const gruposVolume = [...grupos].sort((a, b) => b.volume - a.volume);
+
+      destroyChart('gruposReceita');
+      charts['gruposReceita'] = new Chart(document.getElementById('chartGruposReceita'), {{
+        type: 'bar',
+        data: {{
+          labels: gruposReceita.map(g => short(g.nome, 26)),
+          datasets: [{{
+            data: gruposReceita.map(g => g.receita),
+            backgroundColor: gruposReceita.map((_, i) => PALETTE[i % PALETTE.length]),
+            borderRadius: [0, 4, 4, 0],
+            barThickness: 16
+          }}]
+        }},
+        options: {{
+          indexAxis: 'y',
+          responsive: true,
+          maintainAspectRatio: false,
+          layout: {{ padding: {{ left: 20, right: 15, top: 5, bottom: 5 }} }},
+          plugins: {{
+            tooltip: {{ callbacks: {{ label: ctx => `Receita: ${{BRL(ctx.parsed.x)}}` }} }}
+          }},
+          scales: {{
+            x: {{ grid: {{ color: 'rgba(74, 222, 128, 0.08)' }}, ticks: {{ callback: compact, color: '#9dbca4' }} }},
+            y: {{ grid: {{ display: false }}, ticks: {{ color: '#9dbca4', padding: 8, font: {{ size: 11 }} }} }}
+          }}
+        }}
+      }});
+
+      destroyChart('gruposVolume');
+      charts['gruposVolume'] = new Chart(document.getElementById('chartGruposVolume'), {{
+        type: 'bar',
+        data: {{
+          labels: gruposVolume.map(g => short(g.nome, 26)),
+          datasets: [{{
+            data: gruposVolume.map(g => g.volume),
+            backgroundColor: '#f5c842',
+            borderRadius: [0, 4, 4, 0],
+            barThickness: 16
+          }}]
+        }},
+        options: {{
+          indexAxis: 'y',
+          responsive: true,
+          maintainAspectRatio: false,
+          layout: {{ padding: {{ left: 20, right: 15, top: 5, bottom: 5 }} }},
+          plugins: {{
+            tooltip: {{ callbacks: {{ label: ctx => `Quantidade: ${{NUM(ctx.parsed.x, 2)}} un.` }} }}
+          }},
+          scales: {{
+            x: {{ grid: {{ color: 'rgba(74, 222, 128, 0.08)' }}, ticks: {{ callback: compact, color: '#9dbca4' }} }},
+            y: {{ grid: {{ display: false }}, ticks: {{ color: '#9dbca4', padding: 8, font: {{ size: 11 }} }} }}
+          }}
+        }}
+      }});
+
+      // Tabela Grupos
+      const tblGrupos = document.querySelector('#tblGrupos tbody');
+      tblGrupos.innerHTML = gruposReceita.map((r, i) => `
+        <tr>
+          <td class="cell-nowrap"><span class="rank-circle ${{i === 0 ? 'top1' : i < 3 ? 'top2' : ''}}">${{i + 1}}</span></td>
+          <td class="cell-wrap" style="color: var(--foreground); font-weight: 500;">${{r.nome}}</td>
+          <td class="num text-right cell-nowrap" style="color: var(--foreground); font-weight: 600;">${{BRL(r.receita)}}</td>
+          <td class="num text-right cell-nowrap">${{NUM(r.volume, 2)}}</td>
+          <td class="num text-right cell-nowrap" style="color: var(--muted-foreground); font-weight: 500;">${{BRL(r.ticket)}}</td>
+          <td class="text-right cell-nowrap">
+            <div class="share-bar-wrapper">
+              <div class="share-bar-track"><div class="share-bar-fill" style="width: ${{Math.min(r.share, 100)}}%;"></div></div>
+              <span class="num" style="width: 2.75rem; text-align: right; color: var(--muted-foreground);">${{PCT(r.share)}}</span>
+            </div>
+          </td>
+          <td class="num text-right cell-nowrap" style="color: var(--muted-foreground);">${{r.pedidos}}</td>
+          <td class="num text-right cell-nowrap" style="color: var(--muted-foreground);">${{r.cooperados}}</td>
+        </tr>
+      `).join('') || '<tr><td colspan="8" style="text-align: center; color: var(--muted-foreground); padding: 2rem;">Nenhum registro.</td></tr>';
+
+      // 2. Top 5 Produtos
+      const top5Receita = [...produtos].sort((a, b) => b.receita - a.receita).slice(0, 5);
+      const top5Volume = [...produtos].sort((a, b) => b.volume - a.volume).slice(0, 5);
+
+      destroyChart('top5Receita');
+      charts['top5Receita'] = new Chart(document.getElementById('chartTop5Receita'), {{
+        type: 'bar',
+        data: {{
+          labels: top5Receita.map(p => short(p.nome, 28)),
+          datasets: [{{
+            data: top5Receita.map(p => p.receita),
+            backgroundColor: '#4ade80',
+            borderRadius: [0, 4, 4, 0],
+            barThickness: 16
+          }}]
+        }},
+        options: {{
+          indexAxis: 'y',
+          responsive: true,
+          maintainAspectRatio: false,
+          layout: {{ padding: {{ left: 24, right: 15, top: 5, bottom: 5 }} }},
+          plugins: {{ tooltip: {{ callbacks: {{ label: ctx => `Receita: ${{BRL(ctx.parsed.x)}}` }} }} }},
+          scales: {{
+            x: {{ grid: {{ color: 'rgba(74, 222, 128, 0.08)' }}, ticks: {{ callback: compact, color: '#9dbca4' }} }},
+            y: {{ grid: {{ display: false }}, ticks: {{ color: '#9dbca4', padding: 8, font: {{ size: 10.5 }} }} }}
+          }}
+        }}
+      }});
+
+      destroyChart('top5Volume');
+      charts['top5Volume'] = new Chart(document.getElementById('chartTop5Volume'), {{
+        type: 'bar',
+        data: {{
+          labels: top5Volume.map(p => short(p.nome, 28)),
+          datasets: [{{
+            data: top5Volume.map(p => p.volume),
+            backgroundColor: '#f5c842',
+            borderRadius: [0, 4, 4, 0],
+            barThickness: 16
+          }}]
+        }},
+        options: {{
+          indexAxis: 'y',
+          responsive: true,
+          maintainAspectRatio: false,
+          layout: {{ padding: {{ left: 24, right: 15, top: 5, bottom: 5 }} }},
+          plugins: {{ tooltip: {{ callbacks: {{ label: ctx => `Quantidade: ${{NUM(ctx.parsed.x, 2)}} un.` }} }} }},
+          scales: {{
+            x: {{ grid: {{ color: 'rgba(74, 222, 128, 0.08)' }}, ticks: {{ callback: compact, color: '#9dbca4' }} }},
+            y: {{ grid: {{ display: false }}, ticks: {{ color: '#9dbca4', padding: 8, font: {{ size: 10.5 }} }} }}
+          }}
+        }}
+      }});
+
+      // Tabela Completa Produtos com centavos exatos
+      document.getElementById('subtitulo-tabela-produtos').textContent = `${{produtos.length}} produtos no período filtrado`;
+      const tblProdutos = document.querySelector('#tblProdutos tbody');
+      tblProdutos.innerHTML = produtos.map((r, i) => `
+        <tr>
+          <td class="cell-nowrap"><span class="rank-circle ${{i === 0 ? 'top1' : i < 3 ? 'top2' : ''}}">${{i + 1}}</span></td>
+          <td class="cell-nowrap"><span class="badge badge-${{r.classe.toLowerCase()}}">${{r.classe}}</span></td>
+          <td class="cell-wrap">
+            <p style="color: var(--foreground); font-weight: 500; line-height: 1.3;">${{r.nome}}</p>
+            <p style="font-size: 0.72rem; color: var(--muted-foreground); margin-top: 0.15rem;">${{r.grupo}}</p>
+          </td>
+          <td class="num text-right cell-nowrap" style="color: var(--foreground); font-weight: 600;">${{BRL(r.receita)}}</td>
+          <td class="num text-right cell-nowrap">${{NUM(r.volume, 2)}}</td>
+          <td class="text-right cell-nowrap">
+            <div class="share-bar-wrapper">
+              <div class="share-bar-track"><div class="share-bar-fill" style="width: ${{Math.min(r.share, 100)}}%;"></div></div>
+              <span class="num" style="width: 2.75rem; text-align: right; color: var(--muted-foreground);">${{PCT(r.share)}}</span>
+            </div>
+          </td>
+          <td class="num text-right cell-nowrap" style="color: var(--muted-foreground); font-weight: 500;">${{PCT(r.receitaAcumPct)}}</td>
+          <td class="num text-right cell-nowrap" style="color: var(--muted-foreground);">${{r.pedidos}}</td>
+        </tr>
+      `).join('') || '<tr><td colspan="8" style="text-align: center; color: var(--muted-foreground); padding: 2rem;">Nenhum registro.</td></tr>';
+
+      // 3. Curva ABC / Pareto
+      const prodA = produtos.filter(p => p.classe === 'A');
+      const prodB = produtos.filter(p => p.classe === 'B');
+      const prodC = produtos.filter(p => p.classe === 'C');
+
+      document.getElementById('abc-count-a').textContent = `${{prodA.length}} produtos`;
+      document.getElementById('abc-val-a').textContent = BRL(prodA.reduce((s, r) => s + r.receita, 0));
+      document.getElementById('abc-count-b').textContent = `${{prodB.length}} produtos`;
+      document.getElementById('abc-val-b').textContent = BRL(prodB.reduce((s, r) => s + r.receita, 0));
+      document.getElementById('abc-count-c').textContent = `${{prodC.length}} produtos`;
+      document.getElementById('abc-val-c').textContent = BRL(prodC.reduce((s, r) => s + r.receita, 0));
+
+      document.getElementById('tab-label-a').textContent = `Classe A (${{prodA.length}})`;
+      document.getElementById('tab-label-b').textContent = `Classe B (${{prodB.length}})`;
+      document.getElementById('tab-label-c').textContent = `Classe C (${{prodC.length}})`;
+
+      const top10Pareto = produtos.slice(0, 10);
+      destroyChart('pareto');
+      charts['pareto'] = new Chart(document.getElementById('chartPareto'), {{
+        type: 'bar',
+        data: {{
+          labels: top10Pareto.map(p => short(p.nome, 22)),
+          datasets: [
+            {{
+              type: 'bar',
+              label: 'Receita',
+              data: top10Pareto.map(p => p.receita),
+              backgroundColor: top10Pareto.map(p => p.classe === 'A' ? 'rgba(74, 222, 128, 0.85)' : p.classe === 'B' ? 'rgba(245, 200, 66, 0.85)' : 'rgba(148, 176, 155, 0.6)'),
+              borderRadius: 4,
+              yAxisID: 'y',
+              order: 2,
+              barThickness: 20
+            }},
+            {{
+              type: 'line',
+              label: '% Acumulado',
+              data: top10Pareto.map(p => p.receitaAcumPct),
+              borderColor: '#f5c842',
+              backgroundColor: 'transparent',
+              borderWidth: 2.5,
+              pointRadius: 4,
+              pointHoverRadius: 6,
+              pointBackgroundColor: '#f5c842',
+              tension: 0.25,
+              yAxisID: 'y1',
+              order: 1
+            }}
+          ]
+        }},
+        options: {{
+          responsive: true,
+          maintainAspectRatio: false,
+          layout: {{ padding: {{ left: 15, right: 15, top: 10, bottom: 5 }} }},
+          interaction: {{ mode: 'index', intersect: false }},
+          plugins: {{
+            tooltip: {{
+              callbacks: {{
+                label: ctx => ctx.dataset.type === 'line' ? `% Acumulado: ${{PCT(ctx.parsed.y)}}` : `Receita: ${{BRL(ctx.parsed.y)}}`
+              }}
+            }}
+          }},
+          scales: {{
+            x: {{ grid: {{ display: false }}, ticks: {{ color: '#9dbca4', font: {{ size: 10.5 }} }} }},
+            y: {{ grid: {{ color: 'rgba(74, 222, 128, 0.08)' }}, ticks: {{ callback: compact, color: '#9dbca4' }} }},
+            y1: {{ position: 'right', min: 0, max: 105, grid: {{ display: false }}, ticks: {{ callback: v => `${{v}}%`, color: '#f5c842' }} }}
+          }}
+        }}
+      }});
+
+      renderAbcTable();
+
+      // ==========================================
+      // NOVA SEÇÃO: INTELIGÊNCIA PARA MONTAGEM DE KITS
+      // ==========================================
+      
+      // 1. Grupos ordenados por Ticket Médio por Pedido (Decrescente)
+      const gruposPorTicket = [...grupos].sort((a, b) => b.ticket - a.ticket);
+
+      destroyChart('kitsGruposTicket');
+      charts['kitsGruposTicket'] = new Chart(document.getElementById('chartKitsGruposTicket'), {{
+        type: 'bar',
+        data: {{
+          labels: gruposPorTicket.map(g => short(g.nome, 24)),
+          datasets: [{{
+            data: gruposPorTicket.map(g => g.ticket),
+            backgroundColor: gruposPorTicket.map(g => g.ticket >= 30000 ? '#4ade80' : g.ticket >= 10000 ? '#f5c842' : '#38bdf8'),
+            borderRadius: [0, 4, 4, 0],
+            barThickness: 16
+          }}]
+        }},
+        options: {{
+          indexAxis: 'y',
+          responsive: true,
+          maintainAspectRatio: false,
+          layout: {{ padding: {{ left: 24, right: 15, top: 5, bottom: 5 }} }},
+          plugins: {{
+            tooltip: {{
+              callbacks: {{
+                label: ctx => `Ticket Médio / Pedido: ${{BRL(ctx.parsed.x)}}`
+              }}
+            }}
+          }},
+          scales: {{
+            x: {{ grid: {{ color: 'rgba(74, 222, 128, 0.08)' }}, ticks: {{ callback: compact, color: '#9dbca4' }} }},
+            y: {{ grid: {{ display: false }}, ticks: {{ color: '#9dbca4', padding: 8, font: {{ size: 11 }} }} }}
+          }}
+        }}
+      }});
+
+      // 2. Top 10 Produtos por Ticket Médio por Pedido (Decrescente)
+      const produtosPorTicket = [...produtos].sort((a, b) => b.ticket - a.ticket).slice(0, 10);
+
+      destroyChart('kitsProdutosTicket');
+      charts['kitsProdutosTicket'] = new Chart(document.getElementById('chartKitsProdutosTicket'), {{
+        type: 'bar',
+        data: {{
+          labels: produtosPorTicket.map(p => short(p.nome, 26)),
+          datasets: [{{
+            data: produtosPorTicket.map(p => p.ticket),
+            backgroundColor: produtosPorTicket.map(p => p.ticket >= 20000 ? '#4ade80' : p.ticket >= 7000 ? '#f5c842' : '#38bdf8'),
+            borderRadius: [0, 4, 4, 0],
+            barThickness: 16
+          }}]
+        }},
+        options: {{
+          indexAxis: 'y',
+          responsive: true,
+          maintainAspectRatio: false,
+          layout: {{ padding: {{ left: 24, right: 15, top: 5, bottom: 5 }} }},
+          plugins: {{
+            tooltip: {{
+              callbacks: {{
+                label: ctx => `Ticket Médio / Pedido: ${{BRL(ctx.parsed.x)}}`
+              }}
+            }}
+          }},
+          scales: {{
+            x: {{ grid: {{ color: 'rgba(74, 222, 128, 0.08)' }}, ticks: {{ callback: compact, color: '#9dbca4' }} }},
+            y: {{ grid: {{ display: false }}, ticks: {{ color: '#9dbca4', padding: 8, font: {{ size: 10.5 }} }} }}
+          }}
+        }}
+      }});
+
+      // 3. Tabela Matriz de Classificação de Produtos para Kits com Ícones Flaticon
+      renderKitsTable();
+
+      // 4. Filiais
+      const filiaisReceita = [...filiais].sort((a, b) => b.receita - a.receita);
+      const filiaisVolume = [...filiais].sort((a, b) => b.volume - a.volume);
+
+      destroyChart('filiaisReceita');
+      charts['filiaisReceita'] = new Chart(document.getElementById('chartFiliaisReceita'), {{
+        type: 'bar',
+        data: {{
+          labels: filiaisReceita.map(f => short(f.nome.replace(/^L\\d+:/, ''), 22)),
+          datasets: [{{
+            data: filiaisReceita.map(f => f.receita),
+            backgroundColor: filiaisReceita.map((_, i) => PALETTE[i % PALETTE.length]),
+            borderRadius: [0, 4, 4, 0],
+            barThickness: 16
+          }}]
+        }},
+        options: {{
+          indexAxis: 'y',
+          responsive: true,
+          maintainAspectRatio: false,
+          layout: {{ padding: {{ left: 20, right: 15, top: 5, bottom: 5 }} }},
+          plugins: {{ tooltip: {{ callbacks: {{ label: ctx => `Receita: ${{BRL(ctx.parsed.x)}}` }} }} }},
+          scales: {{
+            x: {{ grid: {{ color: 'rgba(74, 222, 128, 0.08)' }}, ticks: {{ callback: compact, color: '#9dbca4' }} }},
+            y: {{ grid: {{ display: false }}, ticks: {{ color: '#9dbca4', padding: 8 }} }}
+          }}
+        }}
+      }});
+
+      destroyChart('filiaisVolume');
+      charts['filiaisVolume'] = new Chart(document.getElementById('chartFiliaisVolume'), {{
+        type: 'bar',
+        data: {{
+          labels: filiaisVolume.map(f => short(f.nome.replace(/^L\\d+:/, ''), 22)),
+          datasets: [{{
+            data: filiaisVolume.map(f => f.volume),
+            backgroundColor: '#f5c842',
+            borderRadius: [0, 4, 4, 0],
+            barThickness: 16
+          }}]
+        }},
+        options: {{
+          indexAxis: 'y',
+          responsive: true,
+          maintainAspectRatio: false,
+          layout: {{ padding: {{ left: 20, right: 15, top: 5, bottom: 5 }} }},
+          plugins: {{ tooltip: {{ callbacks: {{ label: ctx => `Quantidade: ${{NUM(ctx.parsed.x, 2)}} un.` }} }} }},
+          scales: {{
+            x: {{ grid: {{ color: 'rgba(74, 222, 128, 0.08)' }}, ticks: {{ callback: compact, color: '#9dbca4' }} }},
+            y: {{ grid: {{ display: false }}, ticks: {{ color: '#9dbca4', padding: 8 }} }}
+          }}
+        }}
+      }});
+
+      // Tabela Filiais com centavos exatos
+      const tblFiliais = document.querySelector('#tblFiliais tbody');
+      tblFiliais.innerHTML = filiaisReceita.map((r, i) => `
+        <tr>
+          <td class="cell-nowrap"><span class="rank-circle ${{i === 0 ? 'top1' : i < 3 ? 'top2' : ''}}">${{i + 1}}</span></td>
+          <td class="cell-wrap" style="color: var(--foreground); font-weight: 500;">${{r.nome.replace(/^L\\d+:/, '')}}</td>
+          <td class="num text-right cell-nowrap" style="color: var(--foreground); font-weight: 600;">${{BRL(r.receita)}}</td>
+          <td class="num text-right cell-nowrap">${{NUM(r.volume, 2)}}</td>
+          <td class="num text-right cell-nowrap" style="color: var(--muted-foreground);">${{BRL(r.ticket)}}</td>
+          <td class="text-right cell-nowrap">
+            <div class="share-bar-wrapper">
+              <div class="share-bar-track"><div class="share-bar-fill" style="width: ${{Math.min(r.share, 100)}}%;"></div></div>
+              <span class="num" style="width: 2.75rem; text-align: right; color: var(--muted-foreground);">${{PCT(r.share)}}</span>
+            </div>
+          </td>
+          <td class="num text-right cell-nowrap" style="color: var(--muted-foreground);">${{r.pedidos}}</td>
+          <td class="num text-right cell-nowrap" style="color: var(--muted-foreground);">${{r.cooperados}}</td>
+        </tr>
+      `).join('') || '<tr><td colspan="8" style="text-align: center; color: var(--muted-foreground); padding: 2rem;">Nenhum registro.</td></tr>';
+
+      // 5. Vendedores
+      const vendedoresReceita = [...vendedores].sort((a, b) => b.receita - a.receita);
+      const vendedoresVolume = [...vendedores].sort((a, b) => b.volume - a.volume);
+
+      destroyChart('vendedoresReceita');
+      charts['vendedoresReceita'] = new Chart(document.getElementById('chartVendedoresReceita'), {{
+        type: 'bar',
+        data: {{
+          labels: vendedoresReceita.map(v => short(v.nome, 20)),
+          datasets: [{{
+            data: vendedoresReceita.map(v => v.receita),
+            backgroundColor: vendedoresReceita.map((_, i) => PALETTE[i % PALETTE.length]),
+            borderRadius: [0, 4, 4, 0],
+            barThickness: 14
+          }}]
+        }},
+        options: {{
+          indexAxis: 'y',
+          responsive: true,
+          maintainAspectRatio: false,
+          layout: {{ padding: {{ left: 20, right: 15, top: 5, bottom: 5 }} }},
+          plugins: {{ tooltip: {{ callbacks: {{ label: ctx => `Receita: ${{BRL(ctx.parsed.x)}}` }} }} }},
+          scales: {{
+            x: {{ grid: {{ color: 'rgba(74, 222, 128, 0.08)' }}, ticks: {{ callback: compact, color: '#9dbca4' }} }},
+            y: {{ grid: {{ display: false }}, ticks: {{ color: '#9dbca4', padding: 8 }} }}
+          }}
+        }}
+      }});
+
+      destroyChart('vendedoresVolume');
+      charts['vendedoresVolume'] = new Chart(document.getElementById('chartVendedoresVolume'), {{
+        type: 'bar',
+        data: {{
+          labels: vendedoresVolume.map(v => short(v.nome, 20)),
+          datasets: [{{
+            data: vendedoresVolume.map(v => v.volume),
+            backgroundColor: '#f5c842',
+            borderRadius: [0, 4, 4, 0],
+            barThickness: 14
+          }}]
+        }},
+        options: {{
+          indexAxis: 'y',
+          responsive: true,
+          maintainAspectRatio: false,
+          layout: {{ padding: {{ left: 20, right: 15, top: 5, bottom: 5 }} }},
+          plugins: {{ tooltip: {{ callbacks: {{ label: ctx => `Quantidade: ${{NUM(ctx.parsed.x, 2)}} un.` }} }} }},
+          scales: {{
+            x: {{ grid: {{ color: 'rgba(74, 222, 128, 0.08)' }}, ticks: {{ callback: compact, color: '#9dbca4' }} }},
+            y: {{ grid: {{ display: false }}, ticks: {{ color: '#9dbca4', padding: 8 }} }}
+          }}
+        }}
+      }});
+
+      // Tabela Vendedores
+      const tblVendedores = document.querySelector('#tblVendedores tbody');
+      tblVendedores.innerHTML = vendedoresReceita.map((r, i) => `
+        <tr>
+          <td class="cell-nowrap"><span class="rank-circle ${{i === 0 ? 'top1' : i < 3 ? 'top2' : ''}}">${{i + 1}}</span></td>
+          <td class="cell-wrap" style="color: var(--foreground); font-weight: 500;">${{r.nome}}</td>
+          <td class="num text-right cell-nowrap" style="color: var(--foreground); font-weight: 600;">${{BRL(r.receita)}}</td>
+          <td class="num text-right cell-nowrap">${{NUM(r.volume, 2)}}</td>
+          <td class="num text-right cell-nowrap" style="color: var(--muted-foreground);">${{BRL(r.ticket)}}</td>
+          <td class="text-right cell-nowrap">
+            <div class="share-bar-wrapper">
+              <div class="share-bar-track"><div class="share-bar-fill" style="width: ${{Math.min(r.share, 100)}}%;"></div></div>
+              <span class="num" style="width: 2.75rem; text-align: right; color: var(--muted-foreground);">${{PCT(r.share)}}</span>
+            </div>
+          </td>
+          <td class="num text-right cell-nowrap" style="color: var(--muted-foreground);">${{r.pedidos}}</td>
+          <td class="num text-right cell-nowrap" style="color: var(--muted-foreground);">${{r.cooperados}}</td>
+        </tr>
+      `).join('') || '<tr><td colspan="8" style="text-align: center; color: var(--muted-foreground); padding: 2rem;">Nenhum registro.</td></tr>';
+
+      // 6. Campanhas (Sem cortar rótulos)
+      const campanhasReceita = [...campanhas].sort((a, b) => b.receita - a.receita);
+
+      destroyChart('campanhas');
+      charts['campanhas'] = new Chart(document.getElementById('chartCampanhas'), {{
+        type: 'bar',
+        data: {{
+          labels: campanhasReceita.map(c => c.nome),
+          datasets: [{{
+            data: campanhasReceita.map(c => c.receita),
+            backgroundColor: campanhasReceita.map((_, i) => PALETTE[i % PALETTE.length]),
+            borderRadius: [0, 4, 4, 0],
+            barThickness: 20
+          }}]
+        }},
+        options: {{
+          indexAxis: 'y',
+          responsive: true,
+          maintainAspectRatio: false,
+          layout: {{ padding: {{ left: 24, right: 15, top: 5, bottom: 5 }} }},
+          plugins: {{ tooltip: {{ callbacks: {{ label: ctx => `Receita: ${{BRL(ctx.parsed.x)}}` }} }} }},
+          scales: {{
+            x: {{ grid: {{ color: 'rgba(74, 222, 128, 0.08)' }}, ticks: {{ callback: compact, color: '#9dbca4' }} }},
+            y: {{
+              grid: {{ display: false }},
+              ticks: {{
+                color: '#9dbca4',
+                padding: 10,
+                autoSkip: false,
+                font: {{ size: 11 }}
+              }}
+            }}
+          }}
+        }}
+      }});
+
+      // Tabela Campanhas
+      const tblCampanhas = document.querySelector('#tblCampanhas tbody');
+      tblCampanhas.innerHTML = campanhasReceita.map((r, i) => `
+        <tr>
+          <td class="cell-nowrap"><span class="rank-circle ${{i === 0 ? 'top1' : i < 3 ? 'top2' : ''}}">${{i + 1}}</span></td>
+          <td class="cell-wrap" style="color: var(--foreground); font-weight: 500;">${{r.nome}}</td>
+          <td class="num text-right cell-nowrap" style="color: var(--foreground); font-weight: 600;">${{BRL(r.receita)}}</td>
+          <td class="num text-right cell-nowrap">${{NUM(r.volume, 2)}}</td>
+          <td class="text-right cell-nowrap">
+            <div class="share-bar-wrapper">
+              <div class="share-bar-track"><div class="share-bar-fill" style="width: ${{Math.min(r.share, 100)}}%;"></div></div>
+              <span class="num" style="width: 2.75rem; text-align: right; color: var(--muted-foreground);">${{PCT(r.share)}}</span>
+            </div>
+          </td>
+          <td class="num text-right cell-nowrap" style="color: var(--muted-foreground);">${{r.produtos}}</td>
+          <td class="num text-right cell-nowrap" style="color: var(--muted-foreground);">${{r.pedidos}}</td>
+        </tr>
+      `).join('') || '<tr><td colspan="7" style="text-align: center; color: var(--muted-foreground); padding: 2rem;">Nenhum registro.</td></tr>';
+    }}
+
+    function switchAbcTab(classe) {{
+      currentAbcTab = classe;
+      document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+      const btn = document.getElementById(`tab-btn-${{classe.toLowerCase()}}`);
+      if (btn) btn.classList.add('active');
+      renderAbcTable();
+    }}
+
+    function renderAbcTable() {{
+      if (!currentData) return;
+      const produtosCurva = currentData.produtos.filter(p => p.classe === currentAbcTab);
+      const tblAbc = document.querySelector('#tblAbcDetalhe tbody');
+
+      tblAbc.innerHTML = produtosCurva.map((r) => {{
+        const rankGlobal = currentData.produtos.indexOf(r) + 1;
+        return `
+          <tr>
+            <td class="cell-nowrap"><span class="rank-circle ${{rankGlobal === 1 ? 'top1' : rankGlobal <= 3 ? 'top2' : ''}}">${{rankGlobal}}</span></td>
+            <td class="cell-nowrap"><span class="badge badge-${{r.classe.toLowerCase()}}">${{r.classe}}</span></td>
+            <td class="cell-wrap">
+              <p style="color: var(--foreground); font-weight: 500; line-height: 1.3;">${{r.nome}}</p>
+              <p style="font-size: 0.72rem; color: var(--muted-foreground); margin-top: 0.15rem;">${{r.grupo}}</p>
+            </td>
+            <td class="num text-right cell-nowrap" style="color: var(--foreground); font-weight: 600;">${{BRL(r.receita)}}</td>
+            <td class="num text-right cell-nowrap">${{NUM(r.volume, 2)}}</td>
+            <td class="text-right cell-nowrap">
+              <div class="share-bar-wrapper">
+                <div class="share-bar-track"><div class="share-bar-fill" style="width: ${{Math.min(r.share, 100)}}%;"></div></div>
+                <span class="num" style="width: 2.75rem; text-align: right; color: var(--muted-foreground);">${{PCT(r.share)}}</span>
+              </div>
+            </td>
+            <td class="num text-right cell-nowrap" style="color: var(--muted-foreground); font-weight: 500;">${{PCT(r.receitaAcumPct)}}</td>
+            <td class="num text-right cell-nowrap" style="color: var(--muted-foreground);">${{r.pedidos}}</td>
+          </tr>
+        `;
+      }}).join('') || '<tr><td colspan="8" style="text-align: center; color: var(--muted-foreground); padding: 2rem;">Nenhum produto nesta curva.</td></tr>';
+    }}
+
+    // Ícones Flaticon Style para a Matriz de Kits
+    const ICON_ANCORA = `<svg class="icon icon-primary" style="width: 0.85rem; height: 0.85rem;" viewBox="0 0 24 24"><circle cx="12" cy="5" r="3"/><line x1="12" y1="22" x2="12" y2="8"/><path d="M5 12H2a10 10 0 0 0 20 0h-3"/></svg>`;
+    const ICON_AGREGADOR = `<svg class="icon icon-gold" style="width: 0.85rem; height: 0.85rem;" viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>`;
+    const ICON_GIRO = `<svg class="icon icon-cyan" style="width: 0.85rem; height: 0.85rem;" viewBox="0 0 24 24"><path d="M16.5 9.4 7.55 4.24a1.78 1.78 0 0 0-2.5 1.55v12.42a1.78 1.78 0 0 0 2.5 1.55L16.5 14.6a1.78 1.78 0 0 0 0-3.2Z"/><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><polyline points="3.29 7 12 12 20.71 7"/><line x1="12" y1="22" x2="12" y2="12"/></svg>`;
+
+    function renderKitsTable() {{
+      if (!currentData) return;
+      const filtroGrupo = document.getElementById('filtro-kits-grupo')?.value || '';
+      
+      let prods = [...currentData.produtos].sort((a, b) => b.ticket - a.ticket);
+      if (filtroGrupo) {{
+        prods = prods.filter(p => p.grupo === filtroGrupo);
+      }}
+
+      const tblKits = document.querySelector('#tblKitsClassificacao tbody');
+      tblKits.innerHTML = prods.map((p, i) => {{
+        let papelBadge = '';
+        if (p.ticket >= 20000) {{
+          papelBadge = `<span class="badge badge-kit-ancora">${{ICON_ANCORA}} Âncora de Valor</span>`;
+        }} else if (p.ticket >= 6000) {{
+          papelBadge = `<span class="badge badge-kit-agregador">${{ICON_AGREGADOR}} Agregador de Margem</span>`;
+        }} else {{
+          papelBadge = `<span class="badge badge-kit-giro">${{ICON_GIRO}} Giro & Complemento</span>`;
+        }}
+
+        return `
+          <tr>
+            <td class="cell-nowrap"><span class="rank-circle ${{i === 0 ? 'top1' : i < 3 ? 'top2' : ''}}">${{i + 1}}</span></td>
+            <td class="cell-wrap" style="color: var(--foreground); font-weight: 500;">${{p.nome}}</td>
+            <td class="cell-nowrap" style="color: var(--muted-foreground); font-size: 0.8rem;">${{p.grupo}}</td>
+            <td class="num text-right cell-nowrap" style="color: var(--foreground); font-weight: 600;">${{BRL(p.ticket)}}</td>
+            <td class="num text-right cell-nowrap" style="color: var(--muted-foreground);">${{p.pedidos}}</td>
+            <td class="num text-right cell-nowrap" style="color: var(--muted-foreground); font-weight: 500;">${{BRL(p.receita)}}</td>
+            <td class="cell-nowrap">${{papelBadge}}</td>
+          </tr>
+        `;
+      }}).join('') || '<tr><td colspan="7" style="text-align: center; color: var(--muted-foreground); padding: 2rem;">Nenhum produto encontrado.</td></tr>';
+    }}
+
+    function exportarParaExcel() {{
+      if (!currentData || !currentData.produtos || currentData.produtos.length === 0) {{
+        alert('Nenhum dado disponível para exportação.');
+        return;
+      }}
+
+      const dadosProdutos = currentData.produtos.map((p, i) => {{
+        let papelKit = 'Giro & Complemento';
+        if (p.ticket >= 20000) papelKit = 'Âncora de Valor (High Ticket)';
+        else if (p.ticket >= 6000) papelKit = 'Agregador de Margem (Cross-Selling)';
+
+        return {{
+          'Rank': i + 1,
+          'Classe ABC': p.classe,
+          'Produto': p.nome,
+          'Grupo': p.grupo,
+          'Receita Total / Vendas (R$)': Number(p.receita.toFixed(2)),
+          'Quantidade Vendida': Number(p.volume.toFixed(2)),
+          'Ticket Médio / Pedido (R$)': Number(p.ticket.toFixed(2)),
+          'Papel Sugerido no Kit': papelKit,
+          'Share de Vendas (%)': Number(p.share.toFixed(2)),
+          '% Acumulado': Number(p.receitaAcumPct.toFixed(2)),
+          'Qtd Pedidos': p.pedidos,
+          'Qtd Cooperados': p.cooperados
+        }};
+      }});
+
+      const dadosGrupos = currentData.grupos.map((g, i) => ({{
+        'Rank': i + 1,
+        'Grupo de Produto': g.nome,
+        'Receita Total / Vendas (R$)': Number(g.receita.toFixed(2)),
+        'Quantidade Vendida': Number(g.volume.toFixed(2)),
+        'Ticket Médio / Pedido (R$)': Number(g.ticket.toFixed(2)),
+        'Share (%)': Number(g.share.toFixed(2)),
+        'Qtd Pedidos': g.pedidos,
+        'Qtd Cooperados': g.cooperados
+      }}));
+
+      const dadosFiliais = currentData.filiais.map((f, i) => ({{
+        'Rank': i + 1,
+        'Filial': f.nome.replace(/^L\\d+:/, ''),
+        'Receita Total / Vendas (R$)': Number(f.receita.toFixed(2)),
+        'Quantidade Vendida': Number(f.volume.toFixed(2)),
+        'Ticket Médio (R$)': Number(f.ticket.toFixed(2)),
+        'Share (%)': Number(f.share.toFixed(2)),
+        'Qtd Pedidos': f.pedidos,
+        'Qtd Cooperados': f.cooperados
+      }}));
+
+      const dadosVendedores = currentData.vendedores.map((v, i) => ({{
+        'Rank': i + 1,
+        'Vendedor': v.nome,
+        'Receita Total / Vendas (R$)': Number(v.receita.toFixed(2)),
+        'Quantidade Vendida': Number(v.volume.toFixed(2)),
+        'Ticket Médio (R$)': Number(v.ticket.toFixed(2)),
+        'Share (%)': Number(v.share.toFixed(2)),
+        'Qtd Pedidos': v.pedidos,
+        'Qtd Cooperados': v.cooperados
+      }}));
+
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(dadosProdutos), 'Produtos');
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(dadosGrupos), 'Grupos');
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(dadosFiliais), 'Filiais');
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(dadosVendedores), 'Vendedores');
+
+      const dataHoje = new Date().toISOString().slice(0, 10);
+      XLSX.writeFile(wb, `Mix_de_Produtos_Exportacao_${{dataHoje}}.xlsx`);
+    }}
+
+    function populateFilterOptions() {{
+      const filiais = [...new Set(ALL_RECORDS.map(r => r.filial))].sort();
+      const campanhas = [...new Set(ALL_RECORDS.map(r => r.campanha))].sort();
+      const grupos = [...new Set(ALL_RECORDS.map(r => r.grupo))].sort();
+
+      const selFilial = document.getElementById('filtro-filial');
+      const selCampanha = document.getElementById('filtro-campanha');
+      const selGrupo = document.getElementById('filtro-grupo');
+      const selKitsGrupo = document.getElementById('filtro-kits-grupo');
+
+      filiais.forEach(f => selFilial.add(new Option(f.replace(/^L\\d+:/, ''), f)));
+      campanhas.forEach(c => selCampanha.add(new Option(c, c)));
+      grupos.forEach(g => {{
+        selGrupo.add(new Option(g, g));
+        if (selKitsGrupo) selKitsGrupo.add(new Option(g, g));
+      }});
+    }}
+
+    function applyFilters() {{
+      const iniVal = document.getElementById('filtro-inicio').value;
+      const fimVal = document.getElementById('filtro-fim').value;
+      const filialVal = document.getElementById('filtro-filial').value;
+      const campanhaVal = document.getElementById('filtro-campanha').value;
+      const grupoVal = document.getElementById('filtro-grupo').value;
+
+      const iniDate = iniVal ? new Date(`${{iniVal}}T00:00:00`) : null;
+      const fimDate = fimVal ? new Date(`${{fimVal}}T23:59:59`) : null;
+
+      const filtered = ALL_RECORDS.filter(r => {{
+        const d = parseDate(r.data);
+        if (iniDate && d < iniDate) return false;
+        if (fimDate && d > fimDate) return false;
+        if (filialVal && r.filial !== filialVal) return false;
+        if (campanhaVal && r.campanha !== campanhaVal) return false;
+        if (grupoVal && r.grupo !== grupoVal) return false;
+        return true;
+      }});
+
+      const nProdsFiltrados = new Set(filtered.map(r => r.produto)).size;
+      document.getElementById('contador-registros').textContent = `${{nProdsFiltrados}} produtos distintos (${{filtered.length}} registros de venda)`;
+      const data = aggregate(filtered);
+      renderDashboard(data);
+    }}
+
+    function resetFilters() {{
+      document.getElementById('filtro-inicio').value = '';
+      document.getElementById('filtro-fim').value = '';
+      document.getElementById('filtro-filial').value = '';
+      document.getElementById('filtro-campanha').value = '';
+      document.getElementById('filtro-grupo').value = '';
+      applyFilters();
+    }}
+
+    document.getElementById('filtro-inicio').addEventListener('change', applyFilters);
+    document.getElementById('filtro-fim').addEventListener('change', applyFilters);
+    document.getElementById('filtro-filial').addEventListener('change', applyFilters);
+    document.getElementById('filtro-campanha').addEventListener('change', applyFilters);
+    document.getElementById('filtro-grupo').addEventListener('change', applyFilters);
+    document.getElementById('btn-limpar-filtros').addEventListener('click', resetFilters);
+    document.getElementById('btn-exportar-excel').addEventListener('click', exportarParaExcel);
+    document.getElementById('filtro-kits-grupo')?.addEventListener('change', renderKitsTable);
+
+    // Iniciar carregamento dos dados via API
+    carregarDados();
+  </script>
+</body>
+</html>"""
+
+    with open(output_html_path, "w", encoding="utf-8") as f:
+        f.write(html_content)
+
+    print(f"\n✅ Arquivo estático 'index.html' v7 gerado com sucesso!")
+    print(f"   Destino: {output_html_path}")
+
+
+if __name__ == "__main__":
+    main()
